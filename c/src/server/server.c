@@ -32,7 +32,7 @@ wren_server_t *wren_server_create(uint16_t port) {
     s->epoll_fd = -1;
 
     struct sock_opt opts[] = {{SOL_SOCKET, SO_REUSEADDR, 1}};
-    s->listen_fd = create_sock(port, BACKLOG, opts, 1);
+    s->listen_fd = net_create_sock(port, BACKLOG, opts, 1);
     if (s->listen_fd < 0)
         goto fail;
 

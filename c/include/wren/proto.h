@@ -29,7 +29,7 @@ typedef struct wren_call wren_call_t;
  */
 typedef void (*handler_fn)(wren_call_t *call);
 
-void msg_parse_h(const char *buf, struct msg_header *out);
+size_t proto_dec_header(const char *buf, struct msg_header *out);
 
 size_t proto_enc_u8(char *buf, uint8_t v);
 size_t proto_enc_u16(char *buf, uint16_t v);

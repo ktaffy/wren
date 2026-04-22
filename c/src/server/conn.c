@@ -40,7 +40,7 @@ void handle_conn_event(struct conn *c, uint32_t events) {
 
             while(c->in_len >= MSG_HEADER_SIZE) {
                 struct msg_header hdr;
-                msg_parse_h(c->in_buf, &hdr);
+                proto_dec_header(c->in_buf, &hdr);
                 if (hdr.length < MSG_HEADER_SIZE) {
                     close_rsn = "invalid length";
                     break;

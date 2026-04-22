@@ -3,7 +3,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 
-void msg_parse_h(const char *buf, struct msg_header *out)
+size_t proto_dec_header(const char *buf, struct msg_header *out)
 {
     uint32_t length, req_id;
     uint16_t method_id;
@@ -17,6 +17,8 @@ void msg_parse_h(const char *buf, struct msg_header *out)
     out->length = ntohl(length);
     out->method_id = ntohs(method_id);
     out->req_id = ntohl(req_id);
+
+    return MSG_HEADER_SIZE;
 }
 
 size_t proto_enc_u8(char *buf, uint8_t v)

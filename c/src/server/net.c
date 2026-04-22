@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-int create_sock(uint16_t port, int backlog, const struct sock_opt *opts, size_t n_opts) {
+int net_create_sock(uint16_t port, int backlog, const struct sock_opt *opts, size_t n_opts) {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd < 0) {
         perror("net: socket");

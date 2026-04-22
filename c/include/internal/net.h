@@ -21,4 +21,4 @@ struct sock_opt {
  * @return listening fd on success, -1 on failure with errno set.
  *         Caller must close(). The fd is closed on internal failure.
  */
-int create_sock(uint16_t port, int backlog, const struct sock_opt *opts, size_t n_opts);
+int net_create_sock(uint16_t port, int backlog, const struct sock_opt *opts, size_t n_opts);
