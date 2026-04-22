@@ -8,28 +8,23 @@
       arrays, strings, errors, composites, buffer limits, and concurrency
 - [x] Refactor stage 1: wren_server_t opaque type, public API, event loop
       hidden from user code (examples/main.c reduced to ~20 lines)
+- [x] Refactor stage 2: wren_call_t abstraction with wren_call_read_*/
+      wren_call_reply_* helpers; handlers no longer touch struct conn or
+      req_id directly (handle_add shrank from 15 lines to 5)
+- [x] Refactor stage 3: naming consistency — proto_dec_header,
+      net_create_sock, etc.; prefix rules followed throughout
+- [x] 4a: Send ERROR responses on dispatch failure
 
 ## Refactor stages remaining
-- [ ] Stage 2: wren_call_t abstraction + wren_call_read_*/wren_call_reply_*
-      helpers (replaces current handler signature and wren_send_response)
-- [ ] Stage 3: prefix cleanup — proto_* stays for wire format, wren_* for
-      public API, consistent throughout
-- [ ] Stage 4: correctness gaps — ERROR responses, dynamic in_buf, stricter
-      protocol violation handling
-- [ ] Stage 5: code quality pass — dead code, comments, naming, style
+- [ ] Stage 4: correctness gaps
+      - [ ] 4b: Close connection on protocol violations (method_id 0,
+            invalid length) instead of leniently logging
+      - [ ] 4c: Dynamic in_buf growth for larger messages (currently 4 KiB,
+            spec recommends 64 MiB)
+      - [~] Deferred: true server-side concurrency (worker pool / async) —
+            architectural, deserves its own dedicated refactor
+- [ ] Stage 5: code quality pass — dead code, comments, consistent style
 - [ ] Stage 6: performance pass — TCP_NODELAY, writev, consider arena
-
-## C implementation gaps vs spec v0.2
-- [ ] Dynamic in_buf growth for larger messages (currently capped at 4 KiB;
-      spec recommends 64 MiB). Oversized messages are currently rejected
-      cleanly with "msg too large" close, which is correct but limiting.
-- [ ] Send ERROR responses on dispatch failure (currently only logs stderr;
-      client just times out or hangs)
-- [ ] Consider closing connection on protocol violations (method_id 0,
-      invalid length, etc) instead of leniently logging
-- [ ] True server-side concurrency: current event loop blocks on long-running
-      handlers (handler_concurrent_stress serializes calls). Consider worker
-      thread pool or async handlers.
 
 ## Python implementation gaps
 - [ ] Server side (currently client only)

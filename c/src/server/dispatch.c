@@ -21,13 +21,15 @@ int srv_register(struct wren_server *s, uint16_t method_id, handler_fn fn) {
 
 void srv_dispatch(struct wren_server *s, struct conn *c, const struct msg_header *hdr, const char *payload, size_t payload_len) {
     if (hdr->method_id == 0) {
-        fprintf(stderr, "dispatch: method_id 0 is reserved\n");
+        call_reply_error(c, hdr->req_id, WREN_ERR_METHOD_RESERVED, "method_id 0 is reserved");
         return;
     }
+
     handler_fn fn = srv_handler_get(s, hdr->method_id);
     if (!fn) {
-        fprintf(stderr, "dispatch: no handler for method %u\n", hdr->method_id);
+        call_reply_error(c, hdr->req_id, WREN_ERR_METHOD_NOT_FOUND, "no handler registered for method_id");
         return;
     }
+
     call_dispatch(c, hdr->req_id, payload, payload_len, fn);
 }

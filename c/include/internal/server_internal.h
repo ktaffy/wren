@@ -19,6 +19,19 @@ struct wren_call;
 void call_dispatch(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len, handler_fn fn);
 
 /**
+ * Send an ERROR response on a raw connection without constructing a
+ * wren_call_t. Used by srv_dispatch when a CALL fails validation before
+ * a handler would have been invoked.
+ *
+ * @param c        Connection to send on.
+ * @param req_id   Request id from the incoming CALL.
+ * @param code     Error code (see WREN_ERR_* in wren/proto.h).
+ * @param message  UTF-8 error message. May be NULL.
+ * @return 0 on success, -1 on error.
+ */
+int call_reply_error(struct conn *c, uint32_t req_id, uint32_t code, const char *message);
+
+/**
  * Register a handler on the given server. See wren_server_register for
  * the public wrapper.
  *

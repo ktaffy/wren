@@ -10,6 +10,9 @@
 #define MSG_TYPE_RESPONSE 2
 #define MSG_TYPE_ERROR 3
 
+#define WREN_ERR_METHOD_RESERVED 1001
+#define WREN_ERR_METHOD_NOT_FOUND 1002
+
 struct msg_header {
     uint32_t length;
     uint8_t type;

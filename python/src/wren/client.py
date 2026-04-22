@@ -10,6 +10,9 @@ MSG_TYPE_CALL = 1
 MSG_TYPE_RESPONSE = 2
 MSG_TYPE_ERROR = 3
 
+WREN_ERR_METHOD_RESERVED  = 1001
+WREN_ERR_METHOD_NOT_FOUND = 1002
+
 class WrenError(Exception):
     """Base class for wren errors."""
 

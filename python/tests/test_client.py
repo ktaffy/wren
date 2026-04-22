@@ -28,6 +28,16 @@ def _parse_rows(resp):
 
 class TestClient(unittest.TestCase):
 
+    def test_unknown_method_returns_error(self):
+        """Calling an unregistered method_id now returns an ERROR instead of hanging."""
+        c = Client(HOST, PORT)
+        try:
+            with self.assertRaises(WrenCallError) as cm:
+                c.call(method_id=9999, payload=b"")
+            self.assertEqual(cm.exception.code, 1002)  # WREN_ERR_METHOD_NOT_FOUND
+        finally:
+            c.close()
+
     def test_echo_bytes(self):
         c = Client(HOST, PORT)
         try:

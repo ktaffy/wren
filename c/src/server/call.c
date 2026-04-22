@@ -25,6 +25,46 @@ struct wren_call {
 };
 
 /**
+ * Low-level error sender. Used by srv_dispatch for protocol-level
+ * failures (no wren_call_t exists yet) and by wren_call_reply_error
+ * for handler-level failures.
+ */
+int call_reply_error(struct conn *c, uint32_t req_id, uint32_t code, const char *message) {
+    uint32_t msg_len = message ? (uint32_t)strlen(message) : 0;
+    size_t total = 4 + 4 + msg_len;
+
+    char stack_buf[256];
+    char *buf = (total <= sizeof(stack_buf)) ? stack_buf : malloc(total);
+    if (!buf)
+        return -1;
+
+    size_t off = 0;
+    off += proto_enc_u32(buf + off, code);
+    off += proto_enc_bytes(buf + off, message ? message : "", msg_len);
+
+    char header[MSG_HEADER_SIZE];
+    uint32_t total_len = MSG_HEADER_SIZE + (uint32_t)off;
+    uint32_t len_n = htonl(total_len);
+    uint16_t method_n = 0;
+    uint32_t req_n = htonl(req_id);
+    memcpy(header + 0, &len_n, 4);
+    header[4] = MSG_TYPE_ERROR;
+    header[5] = 0;
+    memcpy(header + 6, &method_n, 2);
+    memcpy(header + 8, &req_n, 4);
+
+    int rc = 0;
+    if (conn_write(c, header, MSG_HEADER_SIZE) < 0)
+        rc = -1;
+    else if (off > 0 && conn_write(c, buf, off) < 0)
+        rc = -1;
+
+    if (buf != stack_buf)
+        free(buf);
+    return rc;
+}
+
+/**
  * Build an internal wren_call for a newly-arrived CALL message.
  * Called by srv_dispatch. Not in the public API.
  */
@@ -238,22 +278,12 @@ int wren_call_reply_raw(wren_call_t *call, const char *data, size_t len) {
 }
 
 int wren_call_reply_error(wren_call_t *call, uint32_t code, const char *message) {
-    uint32_t msg_len = message ? (uint32_t)strlen(message) : 0;
-    size_t total = 4 + 4 + msg_len;
-
-    char stack_buf[256];
-    char *buf = (total <= sizeof(stack_buf)) ? stack_buf : malloc(total);
-    if (!buf) return -1;
-
-    size_t off = 0;
-    off += proto_enc_u32(buf + off, code);
-    off += proto_enc_bytes(buf + off, message ? message : "", msg_len);
-
-    int rc = send_msg(call, MSG_TYPE_ERROR, buf, off);
-
-    if (buf != stack_buf)
-        free(buf);
-    return rc;
+    if (call->replied) {
+        fprintf(stderr, "wren_call: double reply on req_id=%u\n", call->req_id);
+        return -1;
+    }
+    call->replied = true;
+    return call_reply_error(call->conn, call->req_id, code, message);
 }
 
 /**
