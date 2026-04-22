@@ -14,55 +14,103 @@
 void handle_conn_event(struct conn *c, uint32_t events) {
     const char *close_rsn = NULL;
 
-    if (events & (EPOLLERR | EPOLLHUP)) close_rsn = "err/hup";
+    if (events & (EPOLLERR | EPOLLHUP))
+        close_rsn = "err/hup";
 
     if (!close_rsn && (events & EPOLLIN)) {
         for (;;) {
-            size_t space = sizeof(c->in_buf) - c->in_len;
-            if (space == 0) {
-                perror("inbuf full");
-                close_rsn = "buf full";
-                break;
+            size_t tail_space = c->in_cap - c->in_tail;
+
+            if (tail_space == 0) {
+                size_t unread = c->in_tail - c->in_head;
+                if (c->in_head > 0) {
+                    memmove(c->in_buf, c->in_buf + c->in_head, unread);
+                    c->in_tail = unread;
+                    c->in_head = 0;
+                    tail_space = c->in_cap - c->in_tail;
+                }
+                if (tail_space == 0) {
+                    if (c->in_cap >= CONN_IN_BUF_MAX) {
+                        close_rsn = "buf full";
+                        break;
+                    }
+                    size_t new_cap = c->in_cap * 2;
+                    if (new_cap > CONN_IN_BUF_MAX)
+                        new_cap = CONN_IN_BUF_MAX;
+                    char *new_buf = realloc(c->in_buf, new_cap);
+                    if (!new_buf) {
+                        close_rsn = "oom growing in_buf";
+                        break;
+                    }
+                    c->in_buf = new_buf;
+                    c->in_cap = new_cap;
+                    tail_space = c->in_cap - c->in_tail;
+                }
             }
-            ssize_t bytes_read = read(c->fd, c->in_buf + c->in_len, space);
+
+            ssize_t bytes_read = read(c->fd, c->in_buf + c->in_tail, tail_space);
             if (bytes_read > 0) {
-                c->in_len += bytes_read;
-            } else if (bytes_read == 0) {
+                c->in_tail += bytes_read;
+            }
+            else if (bytes_read == 0) {
                 close_rsn = "peer closed";
                 break;
-            } else {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) break;
-                if (errno == EINTR) continue;
+            }
+            else {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    break;
+                if (errno == EINTR)
+                    continue;
                 perror("conn: read");
                 close_rsn = "read error";
                 break;
             }
 
-            while(c->in_len >= MSG_HEADER_SIZE) {
+            while (c->in_tail - c->in_head >= MSG_HEADER_SIZE) {
                 struct msg_header hdr;
-                proto_dec_header(c->in_buf, &hdr);
+                proto_dec_header(c->in_buf + c->in_head, &hdr);
+
                 if (hdr.length < MSG_HEADER_SIZE) {
                     close_rsn = "invalid length";
                     break;
                 }
-                if (hdr.length > sizeof(c->in_buf)) {
+                if (hdr.length > CONN_IN_BUF_MAX) {
                     close_rsn = "msg too large";
                     break;
                 }
-                if (c->in_len < hdr.length) break;
+                if (c->in_tail - c->in_head < hdr.length) {
+                    if (hdr.length > c->in_cap) {
+                        if (c->in_head > 0) {
+                            memmove(c->in_buf, c->in_buf + c->in_head,
+                                    c->in_tail - c->in_head);
+                            c->in_tail -= c->in_head;
+                            c->in_head = 0;
+                        }
+                        if (hdr.length > c->in_cap) {
+                            char *new_buf = realloc(c->in_buf, hdr.length);
+                            if (!new_buf) {
+                                close_rsn = "oom growing in_buf";
+                                break;
+                            }
+                            c->in_buf = new_buf;
+                            c->in_cap = hdr.length;
+                        }
+                    }
+                    break;
+                }
                 if (hdr.type != MSG_TYPE_CALL) {
                     close_rsn = "unexpected message type";
                     break;
                 }
-                const char *payload = c->in_buf + MSG_HEADER_SIZE;
+
+                const char *payload = c->in_buf + c->in_head + MSG_HEADER_SIZE;
                 size_t payload_len = hdr.length - MSG_HEADER_SIZE;
                 srv_dispatch(c->server, c, &hdr, payload, payload_len);
-                size_t remaining = c->in_len - hdr.length;
-                // TODO(perf)
-                memmove(c->in_buf, c->in_buf + hdr.length, remaining);
-                c->in_len = remaining;
+
+                c->in_head += hdr.length;
             }
-            if (close_rsn) break;
+            if (close_rsn)
+                break;
         }
     }
     if (!close_rsn && (events & EPOLLOUT)) {
@@ -95,6 +143,7 @@ void handle_conn_event(struct conn *c, uint32_t events) {
     }
     if (close_rsn) {
         printf("disconnect: fd=%d (%s)\n", c->fd, close_rsn);
+        free(c->in_buf);
         free(c->out_buf);
         close(c->fd);
         free(c);

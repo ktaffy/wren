@@ -3,9 +3,13 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// TODO(Stage 2): fixed 4 KiB limit. Spec recommends 64 MiB per message.
-//                  Requires heap-allocated, growable in_buf.
-#define CONN_IN_BUF_SIZE 4096
+/* Initial capacity of the per-connection input buffer. Grows on demand
+ * up to CONN_IN_BUF_MAX. */
+#define CONN_IN_BUF_INITIAL 4096
+
+/* Maximum input buffer capacity. Connections receiving messages larger
+ * than this are closed. */
+#define CONN_IN_BUF_MAX (64 * 1024 * 1024)
 
 struct wren_server;
 
@@ -20,8 +24,10 @@ struct conn {
     int epoll_fd;
     struct wren_server *server;
 
-    char in_buf[CONN_IN_BUF_SIZE];
-    size_t in_len;
+    char *in_buf;
+    size_t in_cap;
+    size_t in_head;
+    size_t in_tail;
 
     char *out_buf;
     size_t out_len;

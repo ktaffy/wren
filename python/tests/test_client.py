@@ -258,15 +258,50 @@ class TestClient(unittest.TestCase):
         finally:
             c.close()
 
-    def test_echo_large_fails(self):
-        """Sending a 10KB payload to a server with 4 KiB buffer must fail,
-        and it must fail cleanly (no hang, no crash)."""
+    def test_echo_large_succeeds(self):
+        """10 KB should now succeed (buffer grows beyond the initial 4 KiB)."""
         c = Client(HOST, PORT)
         try:
             data = b"x" * 10_000
             payload = struct.pack("!I", len(data)) + data
+            resp = c.call(method_id=15, payload=payload)
+            (n,) = struct.unpack("!I", resp[:4])
+            self.assertEqual(n, len(data))
+            self.assertEqual(resp[4:4+n], data)
+        finally:
+            c.close()
+
+    def test_echo_very_large(self):
+        """1 MiB payload — well beyond the initial 4 KiB."""
+        c = Client(HOST, PORT)
+        try:
+            data = b"y" * (1 << 20)
+            payload = struct.pack("!I", len(data)) + data
+            resp = c.call(method_id=15, payload=payload)
+            (n,) = struct.unpack("!I", resp[:4])
+            self.assertEqual(n, len(data))
+            self.assertEqual(resp[4:4+n], data)
+        finally:
+            c.close()
+
+    def test_echo_too_large_fails(self):
+        """Messages above CONN_IN_BUF_MAX (64 MiB) are still rejected."""
+        c = Client(HOST, PORT)
+        try:
+            # Don't actually allocate 70 MiB — just send a header claiming that
+            # length. The server should reject during framing and close.
+            fake_header = struct.pack("!IBBHI",
+                70 * 1024 * 1024,   # length (70 MiB, above max)
+                1,                   # type = CALL
+                0,                   # flags
+                15,                  # method_id
+                99,                  # req_id
+            )
+            c._sock.sendall(fake_header)
+            # Subsequent use of the connection should fail because the server
+            # closed it on the oversized frame.
             with self.assertRaises(WrenTransportError):
-                c.call(method_id=15, payload=payload)
+                c.call(method_id=1, payload=struct.pack("!II", 1, 2))
         finally:
             c.close()
 

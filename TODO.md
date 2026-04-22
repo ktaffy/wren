@@ -14,13 +14,13 @@
 - [x] Refactor stage 3: naming consistency — proto_dec_header,
       net_create_sock, etc.; prefix rules followed throughout
 - [x] 4a: Send ERROR responses on dispatch failure
+- [x] 4b: Close connewhiction on protocol violations (method_id 0,
+            invalid length) instead of leniently logging
+- [x] 4c: Dynamic in_buf growth for larger messages (currently 4 KiB,
+            spec recommends 64 MiB) using ring buffer
 
 ## Refactor stages remaining
 - [ ] Stage 4: correctness gaps
-      - [ ] 4b: Close connection on protocol violations (method_id 0,
-            invalid length) instead of leniently logging
-      - [ ] 4c: Dynamic in_buf growth for larger messages (currently 4 KiB,
-            spec recommends 64 MiB)
       - [~] Deferred: true server-side concurrency (worker pool / async) —
             architectural, deserves its own dedicated refactor
 - [ ] Stage 5: code quality pass — dead code, comments, consistent style
