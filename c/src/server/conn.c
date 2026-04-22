@@ -50,14 +50,15 @@ void handle_conn_event(struct conn *c, uint32_t events) {
                     break;
                 }
                 if (c->in_len < hdr.length) break;
-                if (hdr.type == MSG_TYPE_CALL) {
-                    const char *payload = c->in_buf + MSG_HEADER_SIZE;
-                    size_t payload_len = hdr.length - MSG_HEADER_SIZE;
-                    srv_dispatch(c->server, c, &hdr, payload, payload_len);
+                if (hdr.type != MSG_TYPE_CALL) {
+                    close_rsn = "unexpected message type";
+                    break;
                 }
+                const char *payload = c->in_buf + MSG_HEADER_SIZE;
+                size_t payload_len = hdr.length - MSG_HEADER_SIZE;
+                srv_dispatch(c->server, c, &hdr, payload, payload_len);
                 size_t remaining = c->in_len - hdr.length;
-                // TODO(Stage 2): memmove per message is O(n) per frame. A ring buffer
-                //             would make this amortized O(1) but adds complexity.
+                // TODO(perf)
                 memmove(c->in_buf, c->in_buf + hdr.length, remaining);
                 c->in_len = remaining;
             }
