@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wrengen"
+version = "0.1.0"
+description = "Code generator for the wren RPC framework"
+requires-python = ">=3.9"
+
+[project.scripts]
+wrengen = "wrengen.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

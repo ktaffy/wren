@@ -1,0 +1,1 @@
+"""wrengen — code generator for the wren RPC framework."""
