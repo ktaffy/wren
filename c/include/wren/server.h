@@ -1,3 +1,9 @@
+// wren/server.h
+/**
+ * Public API for running a wren server. See wren/call.h for the handler-side
+ * API (wren_call_read_*, wren_call_reply_*).
+ */
+
 #pragma once
 
 #include "wren/proto.h"

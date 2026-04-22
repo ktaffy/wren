@@ -1,3 +1,9 @@
+// wren/call.h
+/**
+ * Per-call API available to handlers: read arguments from the incoming
+ * payload with wren_call_read_*, reply with wren_call_reply_*.
+ */
+
 #pragma once
 
 #include <stdint.h>

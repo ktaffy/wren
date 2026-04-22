@@ -1,10 +1,16 @@
+// wren/proto.h
+/**
+ * Wire format primitives for the wren RPC protocol. Must match PROTOCOL.md.
+ * Included by both server-side and client-side code.
+ */
+
 #pragma once
 
 #include <stdint.h>
 #include <stddef.h>
 
 #define MSG_HEADER_SIZE 12
-#define MAX_METHODS 256
+#define MAX_METHODS 65536
 
 #define MSG_TYPE_CALL 1
 #define MSG_TYPE_RESPONSE 2

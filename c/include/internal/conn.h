@@ -14,10 +14,20 @@
 struct wren_server;
 
 /**
- * Per-connection state. One is allocated in handle_accept for each
- * accepted client and freed in handle_conn_event when the connection
- * closes. The pointer is stored in epoll's ev.data.ptr so epoll_wait
- * hands it back directly on every event.
+ * Per-connection state. Allocated in handle_accept for each accepted
+ * client and freed in handle_conn_event when the connection closes.
+ * The pointer is stored in epoll's ev.data.ptr so epoll_wait hands it
+ * back directly on every event.
+ *
+ * Input buffer:
+ *   Unread bytes live in [in_buf+in_head, in_buf+in_tail). Free tail
+ *   space is [in_buf+in_tail, in_buf+in_cap). Compaction slides the
+ *   unread region to the front only when tail space runs out; growth
+ *   doubles in_cap up to CONN_IN_BUF_MAX.
+ *
+ * Output buffer:
+ *   Queued bytes to send are in [out_buf+out_sent, out_buf+out_len).
+ *   Allocated lazily when a send would block, freed when fully drained.
  */
 struct conn {
     int fd;
