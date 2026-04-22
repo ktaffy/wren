@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <sys/uio.h>
 
 /* Initial capacity of the per-connection input buffer. Grows on demand
  * up to CONN_IN_BUF_MAX. */
@@ -66,3 +67,17 @@ void handle_conn_event(struct conn *c, uint32_t events);
  * @return 0 on success (sent or queued), -1 on fatal error.
  */
 int conn_write(struct conn *c, const char *data, size_t len);
+
+/**
+ * Send a vector of buffers atomically, falling back to the per-connection
+ * output queue under backpressure.
+ *
+ * Equivalent to sendv(fd, iov, iovcnt) in terms of bytes on the wire,
+ * but handles short writes and EAGAIN by queueing the unsent tail.
+ *
+ * @param c       Connection.
+ * @param iov     Array of buffers to send, in order.
+ * @param iovcnt  Number of entries in iov.
+ * @return 0 on success (sent or queued), -1 on fatal error.
+ */
+int conn_writev(struct conn *c, const struct iovec *iov, int iovcnt);

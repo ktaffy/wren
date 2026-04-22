@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 
 void handle_conn_event(struct conn *c, uint32_t events) {
     const char *close_rsn = NULL;
@@ -175,4 +176,55 @@ int conn_write(struct conn *c, const char *data, size_t len) {
         return epoll_mod(c->epoll_fd, c->fd, EPOLLIN | EPOLLOUT | EPOLLET | EPOLLRDHUP, c);
     }
     return 0;
+}
+
+int conn_writev(struct conn *c, const struct iovec *iov, int iovcnt) {
+    size_t total = 0;
+    for (int i = 0; i < iovcnt; i++) total += iov[i].iov_len;
+    if (total == 0) return 0;
+
+    if (c->out_len > c->out_sent) {
+        char *grown = realloc(c->out_buf, c->out_len + total);
+        if (!grown) return -1;
+        size_t off = c->out_len;
+        for (int i = 0; i < iovcnt; i++) {
+            memcpy(grown + off, iov[i].iov_base, iov[i].iov_len);
+            off += iov[i].iov_len;
+        }
+        c->out_buf = grown;
+        c->out_len += total;
+        return 0;
+    }
+    ssize_t n;
+    for (;;) {
+        n = writev(c->fd, iov, iovcnt);
+        if (n >= 0) break;
+        if (errno == EINTR) continue;
+        if (errno == EAGAIN || errno == EWOULDBLOCK) { n = 0; break; }
+        return -1;
+    }
+    if ((size_t)n == total) return 0;
+
+    size_t sent = (size_t)n;
+    size_t remaining = total - sent;
+
+    c->out_buf = malloc(remaining);
+    if (!c->out_buf) return -1;
+
+    size_t skip = sent;
+    size_t off = 0;
+    for (int i = 0; i < iovcnt; i++) {
+        if (skip >= iov[i].iov_len) {
+            skip -= iov[i].iov_len;
+            continue;
+        }
+        size_t start = skip;
+        size_t len = iov[i].iov_len - start;
+        memcpy(c->out_buf + off, (const char *)iov[i].iov_base + start, len);
+        off += len;
+        skip = 0;
+    }
+    c->out_len = remaining;
+    c->out_sent = 0;
+    return epoll_mod(c->epoll_fd, c->fd, EPOLLIN | EPOLLOUT | EPOLLET | EPOLLRDHUP, c);
 }

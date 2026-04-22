@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <sys/uio.h>
 
 /**
  * Private layout. Constructed on the stack in srv_dispatch and passed
@@ -53,11 +54,16 @@ int call_reply_error(struct conn *c, uint32_t req_id, uint32_t code, const char 
     memcpy(header + 6, &method_n, 2);
     memcpy(header + 8, &req_n, 4);
 
-    int rc = 0;
-    if (conn_write(c, header, MSG_HEADER_SIZE) < 0)
-        rc = -1;
-    else if (off > 0 && conn_write(c, buf, off) < 0)
-        rc = -1;
+    struct iovec iov[2];
+    iov[0].iov_base = header;
+    iov[0].iov_len = MSG_HEADER_SIZE;
+    int iovcnt = 1;
+    if (off > 0) {
+        iov[1].iov_base = buf;
+        iov[1].iov_len = off;
+        iovcnt = 2;
+    }
+    int rc = conn_writev(c, iov, iovcnt);
 
     if (buf != stack_buf)
         free(buf);
@@ -98,17 +104,22 @@ static int send_msg(struct wren_call *call, uint8_t msg_type, const char *payloa
 
     memcpy(header + 0, &len_n, 4);
     header[4] = msg_type;
-    header[5] = 0; // flags
+    header[5] = 0;
     memcpy(header + 6, &method_n, 2);
     memcpy(header + 8, &req_n, 4);
 
-    if (conn_write(call->conn, header, MSG_HEADER_SIZE) < 0)
-        return -1;
+    struct iovec iov[2];
+    iov[0].iov_base = header;
+    iov[0].iov_len = MSG_HEADER_SIZE;
+    int iovcnt = 1;
+
     if (payload_len > 0) {
-        if (conn_write(call->conn, payload, payload_len) < 0)
-            return -1;
+        iov[1].iov_base = (void *)payload;
+        iov[1].iov_len = payload_len;
+        iovcnt = 2;
     }
-    return 0;
+
+    return conn_writev(call->conn, iov, iovcnt);
 }
 
 bool wren_call_ok(wren_call_t *call) { return call && call->ok; }

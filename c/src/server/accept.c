@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <errno.h>
@@ -33,6 +34,12 @@ int handle_accept(struct wren_server *s) {
         char ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
         printf("connect: fd=%d %s:%u\n", conn_fd, ip, ntohs(addr.sin_port));
+
+        int nodelay = 1;
+        if (setsockopt(conn_fd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay)) < 0) {
+            perror("accept: setsockopt TCP_NODELAY");
+            // not fatal connection still works, just slower
+        }
 
         struct conn *c = calloc(1, sizeof(*c));
         if (!c) {
