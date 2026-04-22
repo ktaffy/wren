@@ -29,28 +29,5 @@ void srv_dispatch(struct wren_server *s, struct conn *c, const struct msg_header
         fprintf(stderr, "dispatch: no handler for method %u\n", hdr->method_id);
         return;
     }
-    fn(c, hdr->req_id, payload, payload_len);
-}
-
-int wren_send_response(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len) {
-    char header[MSG_HEADER_SIZE];
-    uint32_t total_len = MSG_HEADER_SIZE + (uint32_t)payload_len;
-
-    uint32_t len_n = htonl(total_len);
-    uint16_t method_n = 0;
-    uint32_t req_n = htonl(req_id);
-
-    memcpy(header + 0, &len_n, 4);
-    header[4] = MSG_TYPE_RESPONSE;
-    header[5] = 0;
-    memcpy(header + 6, &method_n, 2);
-    memcpy(header + 8, &req_n, 4);
-
-    if (conn_write(c, header, MSG_HEADER_SIZE) < 0)
-        return -1;
-    if (payload_len > 0) {
-        if (conn_write(c, payload, payload_len) < 0)
-            return -1;
-    }
-    return 0;
+    call_dispatch(c, hdr->req_id, payload, payload_len, fn);
 }

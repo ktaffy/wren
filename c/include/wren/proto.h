@@ -10,8 +10,7 @@
 #define MSG_TYPE_RESPONSE 2
 #define MSG_TYPE_ERROR 3
 
-struct msg_header
-{
+struct msg_header {
     uint32_t length;
     uint8_t type;
     uint8_t flags;
@@ -19,9 +18,16 @@ struct msg_header
     uint32_t req_id;
 };
 
-struct conn;
+typedef struct wren_call wren_call_t;
 
-typedef void (*handler_fn)(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len);
+/**
+ * Server-side handler signature. Registered with wren_server_register
+ * and invoked once per incoming CALL. Arguments are read from the call
+ * via wren_call_read_*; the response is sent via wren_call_reply_*.
+ *
+ * The handler should call exactly one reply function before returning.
+ */
+typedef void (*handler_fn)(wren_call_t *call);
 
 void msg_parse_h(const char *buf, struct msg_header *out);
 

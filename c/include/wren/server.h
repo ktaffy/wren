@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wren/proto.h"
+#include "wren/call.h"
 
 /**
  * Opaque server handle. Create with wren_server_create, destroy with
@@ -63,19 +64,3 @@ int wren_server_run(wren_server_t *s);
  * @param s  Server to destroy. May be NULL.
  */
 void wren_server_destroy(wren_server_t *s);
-
-/**
- * Send a RESPONSE message on a connection.
- *
- * Called from within a handler to reply to the current call. The response
- * type is set to MSG_TYPE_RESPONSE; the req_id echoes the value from the
- * original CALL. Handler signatures will pass req_id in; stage 2 will
- * wrap this behind a higher-level wren_call_reply API.
- *
- * @param c            Connection to send on.
- * @param req_id       Request ID from the incoming CALL.
- * @param payload      Response payload bytes (may be NULL if payload_len is 0).
- * @param payload_len  Length of payload in bytes.
- * @return 0 on success, -1 on error (send failed, out of memory).
- */
-int wren_send_response(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len);

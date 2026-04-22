@@ -4,6 +4,19 @@
 
 struct wren_server;
 struct conn;
+struct wren_call;
+
+/**
+ * Invoke the given handler for an incoming CALL. Constructs an internal
+ * wren_call for the duration of the handler.
+ *
+ * @param c            Connection the call arrived on.
+ * @param req_id       Request id from the incoming header.
+ * @param payload      Payload bytes.
+ * @param payload_len  Payload length.
+ * @param fn           Handler to invoke. Must not be NULL.
+ */
+void call_dispatch(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len, handler_fn fn);
 
 /**
  * Register a handler on the given server. See wren_server_register for
