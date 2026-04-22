@@ -3,9 +3,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// TODO(spec-v0.2): fixed 4 KiB limit. Spec recommends 64 MiB per message.
+// TODO(Stage 2): fixed 4 KiB limit. Spec recommends 64 MiB per message.
 //                  Requires heap-allocated, growable in_buf.
 #define CONN_IN_BUF_SIZE 4096
+
+struct wren_server;
 
 /**
  * Per-connection state. One is allocated in handle_accept for each
@@ -16,6 +18,8 @@
 struct conn {
     int fd;
     int epoll_fd;
+    struct wren_server *server;
+
     char in_buf[CONN_IN_BUF_SIZE];
     size_t in_len;
 

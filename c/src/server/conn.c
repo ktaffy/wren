@@ -1,7 +1,7 @@
 #include "internal/conn.h"
 #include "internal/epoll_util.h"
+#include "internal/server_internal.h"
 #include "wren/proto.h"
-#include "wren/server.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,10 +53,10 @@ void handle_conn_event(struct conn *c, uint32_t events) {
                 if (hdr.type == MSG_TYPE_CALL) {
                     const char *payload = c->in_buf + MSG_HEADER_SIZE;
                     size_t payload_len = hdr.length - MSG_HEADER_SIZE;
-                    wren_dispatch(c, &hdr, payload, payload_len);
+                    srv_dispatch(c->server, c, &hdr, payload, payload_len);
                 }
                 size_t remaining = c->in_len - hdr.length;
-                // TODO(perf): memmove per message is O(n) per frame. A ring buffer
+                // TODO(Stage 2): memmove per message is O(n) per frame. A ring buffer
                 //             would make this amortized O(1) but adds complexity.
                 memmove(c->in_buf, c->in_buf + hdr.length, remaining);
                 c->in_len = remaining;

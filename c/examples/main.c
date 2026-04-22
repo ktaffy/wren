@@ -1,20 +1,12 @@
 #include "wren/server.h"
-#include "internal/net.h"
-#include "internal/epoll_util.h"
-#include "internal/accept.h"
-#include "internal/conn.h"
+#include "internal/conn.h" // TODO(stage 2): drop when handlers no longer see struct conn
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <errno.h>
+#include <unistd.h>
 #include <arpa/inet.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
 
-#define BACKLOG 128
-#define MAX_EVENTS 64
 #define PORT 8080
 
 #define METHOD_ADD 1
@@ -427,47 +419,29 @@ static void handle_echo_large(struct conn *c, uint32_t req_id, const char *paylo
 }
 
 int main() {
-    int listen_fd = create_sock(PORT, BACKLOG, (struct sock_opt[]) {{SOL_SOCKET, SO_REUSEADDR, 1}} ,1);
-    if (listen_fd < 0) return 1;
-    printf("listening on port: %u\n", PORT);
-
-    struct epoll_event events[MAX_EVENTS];
-    int epoll_fd = epoll_create1(0);
-    if (epoll_fd < 0) {
-        perror("main: epoll_create1");
-        return -1;
+    wren_server_t *s = wren_server_create(PORT);
+    if (!s) {
+        fprintf(stderr, "failed to create server\n");
+        return 1;
     }
-    if (epoll_add(epoll_fd, listen_fd, EPOLLIN, NULL) < 0) return -1;
 
-    wren_register(METHOD_ADD, handle_add);
-    wren_register(METHOD_ECHO_BYTES, handle_echo_bytes);
-    wren_register(METHOD_NOOP, handle_noop);
-    wren_register(METHOD_PI, handle_pi);
-    wren_register(METHOD_MUL_I64, handle_mul_i64);
-    wren_register(METHOD_MAKE_VEC3, handle_make_vec3);
-    wren_register(METHOD_SUM_ARRAY, handle_sum_array);
-    wren_register(METHOD_DIVIDE, handle_divide);
-    wren_register(METHOD_CONCAT, handle_concat);
-    wren_register(METHOD_IS_EVEN, handle_is_even);
-    wren_register(METHOD_MATMUL_4X4, handle_matmul_4x4);
-    wren_register(METHOD_PARSE_CSV, handle_parse_csv);
-    wren_register(METHOD_CONCURRENT_STRESS, handle_concurrent_stress);
-    wren_register(METHOD_QUERY_DB, handle_query_db);
-    wren_register(METHOD_ECHO_LARGE, handle_echo_large);
+    wren_server_register(s, METHOD_ADD, handle_add);
+    wren_server_register(s, METHOD_ECHO_BYTES, handle_echo_bytes);
+    wren_server_register(s, METHOD_NOOP, handle_noop);
+    wren_server_register(s, METHOD_PI, handle_pi);
+    wren_server_register(s, METHOD_MUL_I64, handle_mul_i64);
+    wren_server_register(s, METHOD_MAKE_VEC3, handle_make_vec3);
+    wren_server_register(s, METHOD_SUM_ARRAY, handle_sum_array);
+    wren_server_register(s, METHOD_DIVIDE, handle_divide);
+    wren_server_register(s, METHOD_CONCAT, handle_concat);
+    wren_server_register(s, METHOD_IS_EVEN, handle_is_even);
+    wren_server_register(s, METHOD_MATMUL_4X4, handle_matmul_4x4);
+    wren_server_register(s, METHOD_PARSE_CSV, handle_parse_csv);
+    wren_server_register(s, METHOD_CONCURRENT_STRESS, handle_concurrent_stress);
+    wren_server_register(s, METHOD_QUERY_DB, handle_query_db);
+    wren_server_register(s, METHOD_ECHO_LARGE, handle_echo_large);
 
-    for (;;) {
-        int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
-        if (n < 0) {
-            if (errno == EINTR) continue;
-            perror("main: epoll_wait"); return -1;
-        }
-        for (int i = 0; i < n; i++) {
-            if (events[i].data.ptr == NULL) {
-                if (handle_accept(epoll_fd, listen_fd) < 0) return 1;
-            } else {
-                handle_conn_event(events[i].data.ptr, events[i].events);
-            }
-        }
-    }
-    return 0;
+    int rc = wren_server_run(s);
+    wren_server_destroy(s);
+    return rc;
 }

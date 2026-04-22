@@ -6,6 +6,18 @@
 - [x] Python client library v0.1 (proves protocol is language-agnostic)
 - [x] Cross-language interop verified via 16-test battery covering primitives,
       arrays, strings, errors, composites, buffer limits, and concurrency
+- [x] Refactor stage 1: wren_server_t opaque type, public API, event loop
+      hidden from user code (examples/main.c reduced to ~20 lines)
+
+## Refactor stages remaining
+- [ ] Stage 2: wren_call_t abstraction + wren_call_read_*/wren_call_reply_*
+      helpers (replaces current handler signature and wren_send_response)
+- [ ] Stage 3: prefix cleanup — proto_* stays for wire format, wren_* for
+      public API, consistent throughout
+- [ ] Stage 4: correctness gaps — ERROR responses, dynamic in_buf, stricter
+      protocol violation handling
+- [ ] Stage 5: code quality pass — dead code, comments, naming, style
+- [ ] Stage 6: performance pass — TCP_NODELAY, writev, consider arena
 
 ## C implementation gaps vs spec v0.2
 - [ ] Dynamic in_buf growth for larger messages (currently capped at 4 KiB;
@@ -26,11 +38,11 @@
 - [ ] Multiplexing (currently one call in flight per client)
 
 ## Framework pieces not yet built
-- [ ] Schema language design — syntax, types, grammar  (← Option C, next)
+- [ ] Schema language design — syntax, types, grammar  (← after refactor)
 - [ ] Schema parser — reads .wren files into an IR
 - [ ] Codegen tool (wrengen) — emits per-language client/server stubs
 - [ ] C client half — connect, multiplex in-flight calls by req_id, read
-      responses (Option D)
+      responses
 
 ## Performance work (after correctness is locked)
 - [ ] TCP_NODELAY on all sockets
