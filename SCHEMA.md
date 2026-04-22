@@ -1,0 +1,174 @@
+# wren schema specification v0.1
+
+A wren schema file (conventionally `*.wren`) describes one or more services
+and any named types they use. The schema is consumed by `wrengen` to
+produce per-language client and server code.
+
+The schema language is deliberately minimal — it describes only what the
+wire protocol can carry (see PROTOCOL.md). Rich features like generics,
+unions, optionals, defaults, and imports are intentionally absent from v1.
+
+## Lexical structure
+
+- **Whitespace** (spaces, tabs, newlines) separates tokens and is otherwise
+  ignored.
+- **Comments** start with `//` and run to the end of the line. There are no
+  block comments.
+- **Identifiers** start with a letter or underscore and contain letters,
+  digits, and underscores. They are case-sensitive.
+
+## Primitive types
+
+These match the wire types defined in PROTOCOL.md exactly.
+
+| Type      | Wire format                         |
+|-----------|-------------------------------------|
+| `bool`    | 1 byte (0 or 1)                     |
+| `u8`      | 1 byte                              |
+| `u16`     | 2 bytes, network byte order         |
+| `u32`     | 4 bytes, network byte order         |
+| `u64`     | 8 bytes, network byte order         |
+| `i8`      | 1 byte (signed)                     |
+| `i16`     | 2 bytes, network byte order         |
+| `i32`     | 4 bytes, network byte order         |
+| `i64`     | 8 bytes, network byte order         |
+| `f32`     | 4 bytes, IEEE 754 binary32          |
+| `f64`     | 8 bytes, IEEE 754 binary64          |
+| `bytes`   | `[len: u32][data: <len> bytes]`     |
+| `string`  | Same wire format as `bytes`; UTF-8  |
+
+## Composite types
+
+### Arrays
+
+- `T[]`  — variable-length array. Wire: `[count: u32][element × count]`.
+- `T[N]` — fixed-length array of exactly `N` elements. Wire: `element × N`,
+  no length prefix.
+
+`T` may be any type: primitive, struct, or another array.
+
+### Structs
+
+A `struct` declaration defines a named composite type. Fields are encoded
+in declaration order, back-to-back, with no padding.
+```
+struct Point {
+    f64 x;
+    f64 y;
+}
+```
+
+Fields follow the syntax `TYPE NAME;`. Arrays and nested structs are
+allowed. Structs must be declared before they are used.
+
+## Services
+
+A `service` declaration defines a group of methods. Each service becomes
+one family of generated stubs (client and/or server).
+
+```
+service Calc {
+    add(u32 a, u32 b) -> u32;
+    log_message(string msg);
+}
+```
+
+### Method syntax
+`METHOD_NAME ( ARG_LIST ) [-> RETURN_TYPE] ;`
+
+- `METHOD_NAME` is an identifier, unique within the service.
+- `ARG_LIST` is a comma-separated list of `TYPE NAME` pairs, or empty.
+- `RETURN_TYPE` is a single type or a parenthesized tuple of typed names.
+  Omit `-> RETURN_TYPE` entirely for methods that return no value.
+
+Method IDs are assigned implicitly by declaration order, starting at 1.
+The first method declared in a service is method_id 1, the second is 2,
+and so on. Method IDs must not be written in the schema. Reordering
+methods is a breaking change to the wire format.
+
+### Multiple return values
+
+A method may return a tuple, treated on the wire as an anonymous struct:
+`divmod(u32 a, u32 b) -> (u32 quotient, u32 remainder);`
+
+Equivalent on the wire to returning a struct with those two fields in
+that order.
+
+## Example
+```
+// calc.wren
+struct Point {
+    f64 x;
+    f64 y;
+}
+struct Row {
+    u32 id;
+    string name;
+    string role;
+}
+service Calc {
+    add(u32 a, u32 b) -> u32;
+    multiply(u32 a, u32 b) -> u32;
+    distance_between(Point p1, Point p2) -> f64;
+
+    sum_array(u32[] values) -> u64;
+
+    divmod(u32 a, u32 b) -> (u32 quotient, u32 remainder);
+
+    list_admins() -> Row[];
+
+    log_message(string msg);       // no return value
+}
+```
+
+## Grammar (EBNF)
+
+```ebnf
+schema         = { declaration } ;
+declaration    = struct_decl | service_decl ;
+
+struct_decl    = "struct" IDENT "{" { field } "}" ;
+field          = type IDENT ";" ;
+
+service_decl   = "service" IDENT "{" { method } "}" ;
+method         = IDENT "(" [ arg_list ] ")" [ "->" return_type ] ";" ;
+arg_list       = arg { "," arg } ;
+arg            = type IDENT ;
+
+return_type    = type | tuple_type ;
+tuple_type     = "(" arg_list ")" ;
+
+type           = base_type { array_suffix } ;
+base_type      = primitive | IDENT ;                (* IDENT references a struct *)
+array_suffix   = "[" [ NUMBER ] "]" ;               (* "[]" = variable, "[N]" = fixed *)
+
+primitive      = "bool" | "u8" | "u16" | "u32" | "u64"
+               | "i8" | "i16" | "i32" | "i64"
+               | "f32" | "f64" | "bytes" | "string" ;
+
+IDENT          = ( letter | "_" ) { letter | digit | "_" } ;
+NUMBER         = digit { digit } ;
+```
+
+## What's intentionally not in v1
+
+- **Imports / multi-file schemas.** One service per file; copy shared types
+  if needed.
+- **Enums.** Use `u32` constants with documented values.
+- **Unions / sum types.** Use a struct with a discriminator field and
+  payload bytes.
+- **Generics.** No `Map<K, V>`, `Option<T>`, etc. Compose out of primitives.
+- **Optional fields.** Use a `bool` flag + the value.
+- **Default values.** Handle in application code.
+- **Annotations / metadata.** No decorator syntax on fields or methods.
+- **Service inheritance or composition.** Flat services only.
+- **Explicit method ID numbering.** IDs are by declaration order.
+- **Error type declarations.** Errors are runtime values; document codes
+  externally.
+
+## Versioning
+
+This is schema language v0.1. The parser and codegen will tolerate
+future additive extensions (new primitives, new declaration kinds) by
+rejecting schemas that use unknown constructs. Breaking changes to
+existing syntax will increment the major version.
