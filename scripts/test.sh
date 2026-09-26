@@ -7,6 +7,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERVER="$ROOT/c/build/release/server"
 LOG="$ROOT/c/build/server.log"
 
+echo "== C unit tests =="
+make -C "$ROOT/c" test
+
 port_open() {
     "$PYTHON" -c "import socket; socket.create_connection(('127.0.0.1', $PORT), timeout=0.2).close()" 2>/dev/null
 }

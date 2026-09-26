@@ -5,6 +5,7 @@ INCLUDE  = -I include
 SRC_DIR     = src
 EXAMPLE_DIR = examples
 BUILD_DIR   = build
+TEST_DIR = tests
 OBJECT_DIR  = $(BUILD_DIR)/obj
 RELEASE_DIR = $(BUILD_DIR)/release
 TARGET      = $(RELEASE_DIR)/server
@@ -15,9 +16,12 @@ LIB_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJECT_DIR)/%.o,$(LIB_SRCS))
 EX_SRCS = $(wildcard $(EXAMPLE_DIR)/*.c)
 EX_OBJS = $(patsubst $(EXAMPLE_DIR)/%.c,$(OBJECT_DIR)/examples/%.o,$(EX_SRCS))
 
+TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
+TEST_BINS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/tests/%,$(TEST_SRCS))
+
 OBJS = $(LIB_OBJS) $(EX_OBJS)
 
-.PHONY: all run clean
+.PHONY: all run clean test
 
 all: $(TARGET)
 
@@ -40,3 +44,10 @@ $(RELEASE_DIR):
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+test: $(TEST_BINS)
+	@for t in $(TEST_BINS); do $$t || exit 1; done
+
+$(BUILD_DIR)/tests/%: $(TEST_DIR)/%.c $(LIB_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(CC_FLAGS) $(INCLUDE) -o $@ $^
