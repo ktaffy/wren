@@ -77,6 +77,11 @@ for now.
 A `service` declaration defines a group of methods. Each service becomes
 one family of generated stubs (client and/or server).
 
+A schema declares at most one service. The wire header carries a method
+ID but no service identifier, so one server hosts exactly one service's
+methods. A program that hosts several services runs one server per
+service.
+
 ```
 service Calc {
     add(u32 a, u32 b) -> u32;
@@ -112,6 +117,9 @@ Method IDs are assigned implicitly by declaration order, starting at 1.
 The first method declared in a service is method_id 1, the second is 2,
 and so on. Method IDs must not be written in the schema. Reordering
 methods is a breaking change to the wire format.
+
+Method IDs are 16-bit on the wire and 0 is reserved (see PROTOCOL.md),
+so a service declares at most 65,535 methods.
 
 ### Multiple return values
 
