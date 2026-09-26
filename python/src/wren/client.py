@@ -115,7 +115,7 @@ class Client:
         return bytes(buf)
     
     def _parse_error(self, payload):
-        if len(payload) < 0:
+        if len(payload) < 8:
             raise WrenTransportError("error payload too short")
         code, msg_len = struct.unpack("!II", payload[:8])
         if len(payload) < 8 + msg_len:
