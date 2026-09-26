@@ -3,12 +3,14 @@ import struct
 import unittest
 import sys
 import types
+import os
 
 from wren.codec import WrenDecodeError
 from wrengen.emit_py import emit_python
 from wrengen.parser import parse
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "calc.wren"
+GOLDEN = pathlib.Path(__file__).parent / "fixtures" / "calc.py.golden"
 
 def load(src):
     code = emit_python(parse(src))
@@ -172,6 +174,17 @@ class TestEmitStructs(unittest.TestCase):
         with self.assertRaises(ValueError):
             Box([1], [3], Reader(5)).encode()
 
+class TestGolden(unittest.TestCase):
+    maxDiff = None
+
+    def test_calc_matches_golden(self):
+        actual = emit_python(parse(FIXTURE.read_text()))
+        if os.environ.get("WRENGEN_UPDATE_GOLDEN"):
+            GOLDEN.write_text(actual)
+        self.assertEqual(
+            actual, GOLDEN.read_text(),
+            "generated code changed; if intended, rerun with "
+            "WRENGEN_UPDATE_GOLDEN=1 and review the diff before committing")
 
 if __name__ == "__main__":
     unittest.main()
