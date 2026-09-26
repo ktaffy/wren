@@ -5,6 +5,7 @@ from .client import (
     WrenError,
     WrenTransportError,
     WrenCallError,
+    WrenTimeoutError,
 )
 
-__all__ = ["Client", "WrenError", "WrenTransportError", "WrenCallError"]
+__all__ = ["Client", "WrenError", "WrenTransportError", "WrenCallError", "WrenTimeoutError"]
