@@ -7,5 +7,6 @@ from .client import (
     WrenCallError,
     WrenTimeoutError,
 )
+from .codec import WrenDecodeError
 
-__all__ = ["Client", "WrenError", "WrenTransportError", "WrenCallError", "WrenTimeoutError"]
+__all__ = ["Client", "WrenError", "WrenTransportError", "WrenCallError", "WrenTimeoutError", "WrenDecodeError"]
