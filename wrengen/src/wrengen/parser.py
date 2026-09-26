@@ -5,12 +5,7 @@ from .ast import (
     PrimitiveType, StructType, ArrayType, Type,
 )
 from .lexer import Token, TokenKind
-
-PRIMITIVES = {
-    "bool", "u8", "u16", "u32", "u64",
-    "i8", "i16", "i32", "i64",
-    "f32", "f64", "bytes", "string",
-}
+from .typemap import PRIMITIVES
 
 class ParseError(Exception):
     def __init__(self, message: str, token: Token):

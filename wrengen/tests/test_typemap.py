@@ -1,7 +1,8 @@
 import struct
 import unittest
 
-from wrengen.parser import PRIMITIVES as PARSER_PRIMITIVES
+from wrengen.ast import PrimitiveType
+from wrengen.parser import parse
 from wrengen.typemap import PRIMITIVES
 
 SPEC_SIZES = {
@@ -16,7 +17,11 @@ INTEGERS = ["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"]
 
 class TestTypeMap(unittest.TestCase):
     def test_covers_exactly_the_parser_primitives(self):
-        self.assertEqual(set(PRIMITIVES), PARSER_PRIMITIVES)
+        for name in PRIMITIVES:
+            with self.subTest(name):
+                schema = parse(f"struct S {{ {name} v; }}")
+                self.assertEqual(schema.structs[0].fields[0].type,
+                                 PrimitiveType(name))
 
     def test_sizes_match_spec(self):
         self.assertEqual({n: p.size for n, p in PRIMITIVES.items()}, SPEC_SIZES)
