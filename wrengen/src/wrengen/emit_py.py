@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from .ast import ArrayType, PrimitiveType, Schema, Struct, StructType, Type
+from .ast import (
+    ArrayType, PrimitiveType, Schema, Service, Struct, StructType, 
+    TupleReturn, Type,
+)
 from .typemap import PRIMITIVES
 
 _HEADER = """\
@@ -95,9 +98,61 @@ def _emit_struct(s: Struct) -> list[str]:
     ]
     return lines
 
+def _return_type(returns: Type | TupleReturn | None) -> str:
+    if returns is None:
+        return "None"
+    if isinstance(returns, TupleReturn):
+        return f"tuple[{', '.join(_py_type(a.type) for a in returns.fields)}]"
+    return _py_type(returns)
+
+def _return_expr(returns: Type | TupleReturn) -> str:
+    if isinstance(returns, TupleReturn):
+        return f"({', '.join(_decode_expr(a.type) for a in returns.fields)},)"
+    return _decode_expr(returns)
+
+def _emit_service(svc: Service) -> list[str]:
+    lines = [
+        f"class {svc.name}:",
+        f'    """Typed client for service {svc.name}. Wraps a wren.Client."""',
+        "",
+        "    def __init__(_self, _client) -> None:",
+        "        _self._client = _client",
+        "",
+        "    def close(_self) -> None:",
+        "        _self._client.close()",
+        "",
+        f"    def __enter__(_self) -> {svc.name}:",
+        "        return _self",
+        "",
+        "    def __exit__(_self, *_exc) -> None:",
+        "        _self.close()",
+    ]
+    for m in svc.methods:
+        params = "".join(f", {a.name}: {_py_type(a.type)}" for a in m.args)
+        lines += [
+            "",
+            f"    def {m.name}(_self{params}) -> {_return_type(m.returns)}:",
+            "        _w = _codec.Writer()",
+        ]
+        body = [line for a in m.args
+                for line in _encode_lines(a.type, a.name, 0)]
+        lines += ["        " + line for line in body]
+        lines.append(f"        _r = _codec.Reader("
+                     f"_self._client.call({m.method_id}, _w.getvalue()))")
+        if m.returns is None:
+            lines.append("        _r.expect_end()")
+        else:
+            lines += [
+                f"        _value = {_return_expr(m.returns)}",
+                "        _r.expect_end()",
+                "        return _value",
+            ]
+    return lines
 
 def emit_python(schema: Schema) -> str:
     parts = [_HEADER]
     for s in schema.structs:
         parts.append("\n\n" + "\n".join(_emit_struct(s)) + "\n")
+    for svc in schema.services:
+        parts.append("\n\n" + "\n".join(_emit_service(svc)) + "\n")
     return "".join(parts)

@@ -20,6 +20,81 @@ def load(src):
         del sys.modules[module.__name__]
     return module.__dict__
 
+class FakeTransport:
+    def __init__(self, reply=b""):
+        self.reply = reply
+        self.calls = []
+        self.closed = False
+
+    def call(self, method_id, payload=b""):
+        self.calls.append((method_id, payload))
+        return self.reply
+
+    def close(self):
+        self.closed = True
+
+class TestEmitClient(unittest.TestCase):
+    def setUp(self):
+        self.ns = load(FIXTURE.read_text())
+        self.Calc = self.ns["Calc"]
+
+    def calc(self, reply):
+        t = FakeTransport(reply)
+        return self.Calc(t), t
+
+    def test_add_sends_protocol_example(self):
+        calc, t = self.calc(struct.pack("!I", 7))
+        self.assertEqual(calc.add(3, 4), 7)
+        self.assertEqual(t.calls, [(1, struct.pack("!II", 3, 4))])
+
+    def test_method_ids_follow_declaration_order(self):
+        calc, t = self.calc(b"")
+        self.assertIsNone(calc.log_message("hi"))
+        self.assertEqual(t.calls, [(7, b"\x00\x00\x00\x02hi")])
+
+    def test_struct_arguments(self):
+        Point = self.ns["Point"]
+        calc, t = self.calc(struct.pack("!d", 5.0))
+        self.assertEqual(calc.distance_between(Point(0.0, 0.0), Point(3.0, 4.0)), 5.0)
+        self.assertEqual(t.calls, [(3, struct.pack("!dddd", 0.0, 0.0, 3.0, 4.0))])
+
+    def test_array_argument(self):
+        calc, t = self.calc(struct.pack("!Q", 6))
+        self.assertEqual(calc.sum_array([1, 2, 3]), 6)
+        self.assertEqual(t.calls, [(4, struct.pack("!IIII", 3, 1, 2, 3))])
+
+    def test_tuple_return(self):
+        calc, _ = self.calc(struct.pack("!II", 3, 1))
+        self.assertEqual(calc.divmod(7, 2), (3, 1))
+
+    def test_array_of_structs_return(self):
+        Row = self.ns["Row"]
+        reply = (struct.pack("!I", 1) + Row(1, "alice", "admin").encode())
+        calc, _ = self.calc(reply)
+        self.assertEqual(calc.list_admins(), [Row(1, "alice", "admin")])
+
+    def test_one_element_tuple_return(self):
+        S = load("service S { f() -> (u32 q); }")["S"]
+        s = S(FakeTransport(struct.pack("!I", 9)))
+        self.assertEqual(s.f(), (9,))
+
+    def test_argument_names_cannot_collide_with_generated_locals(self):
+        S = load("service S { f(u32 w, u32 r, u32 self); }")["S"]
+        t = FakeTransport()
+        S(t).f(1, 2, 3)
+        self.assertEqual(t.calls, [(1, struct.pack("!III", 1, 2, 3))])
+
+    def test_reply_with_trailing_bytes_raises(self):
+        calc, _ = self.calc(b"\x00" * 5)
+        with self.assertRaises(WrenDecodeError):
+            calc.add(3, 4)
+
+    def test_context_manager_closes_transport(self):
+        t = FakeTransport()
+        with self.Calc(t):
+            pass
+        self.assertTrue(t.closed)
+
 class TestEmitStructs(unittest.TestCase):
     def test_fixture_generates_runnable_code(self):
         ns = load(FIXTURE.read_text())
