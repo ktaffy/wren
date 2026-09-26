@@ -96,10 +96,9 @@ def check_single_service(schema: Schema) -> Iterator[Diagnostic]:
     services = schema.services
     for extra in services[1:]:
         yield Diagnostic(
-            f"only one service per schema allowed "
-            f"(first delcared on line {services[0].line})",
-            extra.line, extra.call
-        )
+            f"only one service per schema is allowed "
+            f"(first declared on line {services[0].line})",
+            extra.line, extra.col)
 
 def check_method_count(schema: Schema) -> Iterator[Diagnostic]:
     for svc in schema.services:
