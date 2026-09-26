@@ -7,7 +7,6 @@ from wrengen.ast import (
     PrimitiveType, StructType, ArrayType,
 )
 
-
 class TestParser(unittest.TestCase):
 
     def test_empty_schema(self):
@@ -115,6 +114,54 @@ class TestParser(unittest.TestCase):
         with self.assertRaises(ParseError):
             parse("enum Color { red, green }")
 
+def pos(node):
+    return (node.line, node.col)
+
+class TestPositions(unittest.TestCase):
+    SRC = (
+        "struct Point {\n"
+        "    f64 x;\n"
+        "}\n"
+        "service Calc {\n"
+        "    dist(Point a) -> f64;\n"
+        "}\n"
+    )
+
+    def setUp(self):
+        self.schema = parse(self.SRC)
+        self.struct = self.schema.structs[0]
+        self.service = self.schema.services[0]
+        self.method = self.service.methods[0]
+
+    def test_struct_position_is_keyword(self):
+        self.assertEqual(pos(self.struct), (1, 1))
+
+    def test_field_and_its_type(self):
+        f = self.struct.fields[0]
+        self.assertEqual(pos(f), (2, 5))
+        self.assertEqual(pos(f.type), (2, 5))
+
+    def test_service_position_is_keyword(self):
+        self.assertEqual(pos(self.service), (4, 1))
+
+    def test_method_position_is_name(self):
+        self.assertEqual(pos(self.method), (5, 5))
+
+    def test_arg_and_struct_reference(self):
+        a = self.method.args[0]
+        self.assertEqual(pos(a), (5, 10))
+        self.assertEqual(pos(a.type), (5, 10))
+
+    def test_return_type(self):
+        self.assertEqual(pos(self.method.returns), (5, 22))
+
+    def test_positions_ignored_by_equality_and_hash(self):
+        a = PrimitiveType("u32", line=1, col=1)
+        b = PrimitiveType("u32", line=9, col=9)
+        self.assertEqual(a, b)
+        self.assertEqual(hash(a), hash(b))
+        self.assertEqual(self.struct.fields[0],
+                         Field("x", PrimitiveType("f64")))
 
 if __name__ == "__main__":
     unittest.main()

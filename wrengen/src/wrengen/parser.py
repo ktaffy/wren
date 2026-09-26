@@ -6,26 +6,21 @@ from .ast import (
 )
 from .lexer import Token, TokenKind
 
-
 PRIMITIVES = {
     "bool", "u8", "u16", "u32", "u64",
     "i8", "i16", "i32", "i64",
     "f32", "f64", "bytes", "string",
 }
 
-
 class ParseError(Exception):
     def __init__(self, message: str, token: Token):
         super().__init__(f"line {token.line}:{token.col}: {message} (got {token.kind.name} {token.value!r})")
         self.token = token
 
-
 class Parser:
-
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
         self.pos = 0
-
 
     def peek(self) -> Token:
         return self.tokens[self.pos]
@@ -63,7 +58,7 @@ class Parser:
         return Schema(structs=tuple(structs), services=tuple(services))
 
     def parse_struct(self) -> Struct:
-        self.expect(TokenKind.STRUCT)
+        kw = self.expect(TokenKind.STRUCT)
         name_tok = self.expect(TokenKind.IDENT)
         self.expect(TokenKind.LBRACE)
 
@@ -72,16 +67,19 @@ class Parser:
             fields.append(self.parse_field())
 
         self.expect(TokenKind.RBRACE)
-        return Struct(name=name_tok.value, fields=tuple(fields))
+        return Struct(name=name_tok.value, fields=tuple(fields),
+                      line=kw.line, col=kw.col)
 
     def parse_field(self) -> Field:
+        start = self.peek()
         ftype = self.parse_type()
         name_tok = self.expect(TokenKind.IDENT)
         self.expect(TokenKind.SEMI)
-        return Field(name=name_tok.value, type=ftype)
+        return Field(name=name_tok.value, type=ftype,
+                     line=start.line, col=start.col)
 
     def parse_service(self) -> Service:
-        self.expect(TokenKind.SERVICE)
+        kw = self.expect(TokenKind.SERVICE)
         name_tok = self.expect(TokenKind.IDENT)
         self.expect(TokenKind.LBRACE)
 
@@ -92,7 +90,8 @@ class Parser:
             next_id += 1
 
         self.expect(TokenKind.RBRACE)
-        return Service(name=name_tok.value, methods=tuple(methods))
+        return Service(name=name_tok.value, methods=tuple(methods),
+                       line=kw.line, col=kw.col)
 
     def parse_method(self, method_id: int) -> Method:
         name_tok = self.expect(TokenKind.IDENT)
@@ -115,12 +114,16 @@ class Parser:
             args=tuple(args),
             returns=returns,
             method_id=method_id,
+            line=name_tok.line,
+            col=name_tok.col
         )
 
     def parse_arg(self) -> Arg:
+        start = self.peek()
         atype = self.parse_type()
         name_tok = self.expect(TokenKind.IDENT)
-        return Arg(name=name_tok.value, type=atype)
+        return Arg(name=name_tok.value, type=atype,
+                   line=start.line, col=start.col)
 
     def parse_return_type(self) -> Type | TupleReturn:
         if self.peek().kind == TokenKind.LPAREN:
@@ -136,9 +139,9 @@ class Parser:
     def parse_type(self) -> Type:
         tok = self.expect(TokenKind.IDENT)
         if tok.value in PRIMITIVES:
-            base: Type = PrimitiveType(name=tok.value)
+            base: Type = PrimitiveType(name=tok.value, line=tok.line, col=tok.col)
         else:
-            base = StructType(name=tok.value)
+            base = StructType(name=tok.value, line=tok.line, col=tok.col)
 
         while self.peek().kind == TokenKind.LBRACK:
             self.advance()  # '['
