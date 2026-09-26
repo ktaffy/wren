@@ -48,6 +48,12 @@ wren_server_t *wren_server_create(uint16_t port);
 int wren_server_register(wren_server_t *s, uint16_t method_id, handler_fn fn);
 
 /**
+ * Like wren_server_register, but also stores @p ctx with the handler; the
+ * handler reads it back with wren_call_ctx().
+ */
+int wren_server_register_ctx(wren_server_t *s, uint16_t method_id, handler_fn fn, void *ctx);
+
+/**
  * Run the server's event loop.
  *
  * Blocks the calling thread until the loop exits (e.g., on unrecoverable

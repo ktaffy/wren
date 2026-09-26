@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "wren/codec.h"
+
 /**
  * A single in-flight RPC call on the server side.
  *
@@ -106,3 +108,15 @@ int wren_call_reply_raw(wren_call_t *call, const char *data, size_t len);
  * @param message  UTF-8 error description. May be NULL or empty.
  */
 int wren_call_reply_error(wren_call_t *call, uint32_t code, const char *message);
+
+/** Context pointer given to wren_server_register_ctx for this method. */
+void *wren_call_ctx(wren_call_t *call);
+
+/** Arena for this call. Freed automatically after the handler returns. */
+wren_arena_t *wren_call_arena(wren_call_t *call);
+
+/** Raw payload bytes, valid until the handler returns. */
+void wren_call_payload(wren_call_t *call, const char **data, size_t *len);
+
+/** True once any reply function has sent a reply for this call. */
+bool wren_call_replied(const wren_call_t *call);

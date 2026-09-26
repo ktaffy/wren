@@ -16,7 +16,7 @@ struct wren_call;
  * @param payload_len  Payload length.
  * @param fn           Handler to invoke. Must not be NULL.
  */
-void call_dispatch(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len, handler_fn fn);
+void call_dispatch(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len, handler_fn fn, void *ctx);
 
 /**
  * Send an ERROR response on a raw connection without constructing a
@@ -40,7 +40,7 @@ int call_reply_error(struct conn *c, uint32_t req_id, uint32_t code, const char 
  * @param fn         Handler function pointer.
  * @return 0 on success, -1 on error.
  */
-int srv_register(struct wren_server *s, uint16_t method_id, handler_fn fn);
+int srv_register(struct wren_server *s, uint16_t method_id, handler_fn fn, void *ctx);
 
 /**
  * Dispatch a received CALL message to the registered handler.
@@ -57,13 +57,13 @@ void srv_dispatch(struct wren_server *s, struct conn *c, const struct msg_header
  * Return the handler registered at @p method_id, or NULL if none is
  * registered or the id is out of range.
  */
-handler_fn srv_handler_get(struct wren_server *s, uint16_t method_id);
+handler_fn srv_handler_get(struct wren_server *s, uint16_t method_id, void **ctx);
 
 /**
  * Set the handler at @p method_id. Caller is responsible for bounds and
  * reservation checks (see srv_register for the validated entry point).
  */
-void srv_handler_set(struct wren_server *s, uint16_t method_id, handler_fn fn);
+void srv_handler_set(struct wren_server *s, uint16_t method_id, handler_fn fn, void *ctx);
 
 /**
  * Return the listen socket fd. Used by handle_accept.

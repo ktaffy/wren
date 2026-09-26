@@ -15,11 +15,16 @@
 #define BACKLOG 128
 #define MAX_EVENTS 64
 
+struct handler_entry {
+    handler_fn fn;
+    void *ctx;
+};
+
 struct wren_server {
     int listen_fd;
     int epoll_fd;
     uint16_t port;
-    handler_fn handlers[MAX_METHODS];
+    struct handler_entry handlers[MAX_METHODS];
 };
 
 wren_server_t *wren_server_create(uint16_t port) {
@@ -54,7 +59,11 @@ fail:
 }
 
 int wren_server_register(wren_server_t *s, uint16_t method_id, handler_fn fn) {
-    return srv_register(s, method_id, fn);
+    return srv_register(s, method_id, fn, NULL);
+}
+
+int wren_server_register_ctx(wren_server_t *s, uint16_t method_id, handler_fn fn, void *ctx) {
+    return srv_register(s, method_id, fn, ctx);
 }
 
 int wren_server_run(wren_server_t *s) {
@@ -94,15 +103,16 @@ void wren_server_destroy(wren_server_t *s) {
     free(s);
 }
 
-handler_fn srv_handler_get(struct wren_server *s, uint16_t method_id)
-{
+handler_fn srv_handler_get(struct wren_server *s, uint16_t method_id, void **ctx) {
     if (!s || method_id >= MAX_METHODS)
         return NULL;
-    return s->handlers[method_id];
+    *ctx = s->handlers[method_id].ctx;
+    return s->handlers[method_id].fn;
 }
 
-void srv_handler_set(struct wren_server *s, uint16_t method_id, handler_fn fn) {
-    s->handlers[method_id] = fn;
+void srv_handler_set(struct wren_server *s, uint16_t method_id, handler_fn fn, void *ctx) {
+    s->handlers[method_id].fn = fn;
+    s->handlers[method_id].ctx = ctx;
 }
 
 int srv_listen_fd(struct wren_server *s) {

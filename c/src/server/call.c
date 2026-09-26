@@ -21,6 +21,9 @@ struct wren_call {
     size_t payload_len;
     size_t cursor;
 
+    void *ctx;
+    wren_arena_t arena;
+
     bool ok;
     bool replied;
 };
@@ -74,7 +77,7 @@ int call_reply_error(struct conn *c, uint32_t req_id, uint32_t code, const char 
  * Build an internal wren_call for a newly-arrived CALL message.
  * Called by srv_dispatch. Not in the public API.
  */
-static void call_init(struct wren_call *call, struct conn *c, uint32_t req_id, const char *payload, size_t payload_len) {
+static void call_init(struct wren_call *call, struct conn *c, uint32_t req_id, const char *payload, size_t payload_len, void *ctx) {
     call->conn = c;
     call->req_id = req_id;
     call->payload = payload;
@@ -82,6 +85,8 @@ static void call_init(struct wren_call *call, struct conn *c, uint32_t req_id, c
     call->cursor = 0;
     call->ok = true;
     call->replied = false;
+    call->ctx = ctx;
+    call->arena = (wren_arena_t){0};
 }
 
 /**
@@ -304,9 +309,18 @@ int wren_call_reply_error(wren_call_t *call, uint32_t code, const char *message)
  *
  * Declared in server_internal.h; called by srv_dispatch.
  */
-void call_dispatch(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len, handler_fn fn)
-{
+void call_dispatch(struct conn *c, uint32_t req_id, const char *payload, size_t payload_len, handler_fn fn, void *ctx) {
     struct wren_call call;
-    call_init(&call, c, req_id, payload, payload_len);
+    call_init(&call, c, req_id, payload, payload_len, ctx);
     fn(&call);
+    wren_arena_free(&call.arena);
+}
+
+void *wren_call_ctx(wren_call_t *call) { return call->ctx; }
+wren_arena_t *wren_call_arena(wren_call_t *call) { return &call->arena; }
+bool wren_call_replied(const wren_call_t *call) { return call->replied; }
+
+void wren_call_payload(wren_call_t *call, const char **data, size_t *len) {
+    *data = call->payload;
+    *len = call->payload_len;
 }
