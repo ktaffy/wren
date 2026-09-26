@@ -121,6 +121,20 @@ methods is a breaking change to the wire format.
 Method IDs are 16-bit on the wire and 0 is reserved (see PROTOCOL.md),
 so a service declares at most 65,535 methods.
 
+## Reserved names
+
+Generated code must never collide with the target languages or with the
+names it defines for itself. The following are rejected anywhere a name
+is declared (structs, services, fields, methods, arguments, and tuple
+return names):
+
+- **Identifiers beginning with an underscore.** These are reserved for
+  names generated code uses internally.
+- **Keywords of any target language:** Python's keywords, and C's
+  keywords (C11, plus `bool`, `true`, and `false`).
+- **Names of generated members:** `encode` and `decode` as field names,
+  and `close` as a method name.
+
 ### Multiple return values
 
 A method may return a tuple, treated on the wire as an anonymous struct:
