@@ -1,9 +1,10 @@
 import pathlib
 import unittest
 
+import keyword
 from wrengen.ast import Method, Schema, Service
 from wrengen.parser import parse
-from wrengen.validate import Diagnostic, validate
+from wrengen.validate import Diagnostic, validate, PYTHON_KEYWORDS
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "calc.wren"
 
@@ -95,7 +96,6 @@ class TestStructRefs(unittest.TestCase):
         ])
 
 class TestDupNames(unittest.TestCase):
-
     def test_same_name_in_different_scopes_is_valid(self):
         src = ("struct Point { f64 x; }\n"
                "struct point { f64 x; }\n"
@@ -143,7 +143,6 @@ class TestDupNames(unittest.TestCase):
         ])
 
 class TestSingleService(unittest.TestCase):
-
     def test_structs_only_is_valid(self):
         self.assertEqual(diags("struct P { f64 x; }"), [])
 
@@ -172,6 +171,51 @@ class TestMethodCount(unittest.TestCase):
         self.assertEqual(
             [str(d) for d in validate(service_with(65536))],
             ["line 65537:5: service 'S' declares 65536 methods; at most 65535 allowed"])
+
+class TestReservedNames(unittest.TestCase):
+    def test_near_misses_are_valid(self):
+        src = ("struct Row { u32 id; string type; string match; u32 close; }\n"
+               "service S { encode(); decode(u32 encoded); }\n")
+        self.assertEqual(diags(src), [])
+
+    def test_underscore_prefix(self):
+        self.assertEqual(
+            diags("struct _P {}"),
+            ["line 1:1: struct name '_P' is reserved: "
+             "names starting with '_' are reserved for generated code"])
+
+    def test_python_keyword(self):
+        self.assertEqual(
+            diags("struct P { u32 from; }"),
+            ["line 1:12: field name 'from' is reserved: it is a Python keyword"])
+
+    def test_c_keyword(self):
+        self.assertEqual(
+            diags("service S { f(u32 default); }"),
+            ["line 1:15: argument name 'default' is reserved: it is a C keyword"])
+
+    def test_generated_field_member(self):
+        self.assertEqual(
+            diags("struct P { u32 encode; }"),
+            ["line 1:12: field name 'encode' is reserved: "
+             "generated code defines a member with this name"])
+
+    def test_generated_method_member(self):
+        self.assertEqual(
+            diags("service S { close(); }"),
+            ["line 1:13: method name 'close' is reserved: "
+             "generated code defines a member with this name"])
+
+    def test_tuple_return_name(self):
+        self.assertEqual(
+            diags("service S { f() -> (u32 _q, u32 r); }"),
+            ["line 1:21: return value name '_q' is reserved: "
+             "names starting with '_' are reserved for generated code"])
+
+    def test_keyword_list_covers_running_python(self):
+        missing = set(keyword.kwlist) - PYTHON_KEYWORDS
+        self.assertEqual(missing, set(),
+                         "new Python keywords; add them to PYTHON_KEYWORDS")
 
 if __name__ == "__main__":
     unittest.main()

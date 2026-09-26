@@ -7,6 +7,30 @@ from .ast import Schema, Struct, StructType, ArrayType, TupleReturn, Type
 
 MAX_METHODS_PER_SERVICE = 65535
 
+# hardcoded keywords for now and not read from keyword module.
+# schema shouldnt depend on which python version is running.
+# will find a better apprach later, have to move on for now
+PYTHON_KEYWORDS = frozenset({
+    "False", "None", "True", "and", "as", "assert", "async", "await",
+    "break", "class", "continue", "def", "del", "elif", "else", "except",
+    "finally", "for", "from", "global", "if", "import", "in", "is",
+    "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try",
+    "while", "with", "yield",
+})
+
+C_KEYWORDS = frozenset({
+    "auto", "break", "case", "char", "const", "continue", "default", "do",
+    "double", "else", "enum", "extern", "float", "for", "goto", "if",
+    "inline", "int", "long", "register", "restrict", "return", "short",
+    "signed", "sizeof", "static", "struct", "switch", "typedef", "union",
+    "unsigned", "void", "volatile", "while", "bool", "true", "false",
+})
+
+GENERATED_MEMBERS = {
+    "field": frozenset({"encode", "decode"}),
+    "method": frozenset({"close"}),
+}
+
 @dataclass(frozen=True)
 class Diagnostic:
     message: str
@@ -109,6 +133,37 @@ def check_method_count(schema: Schema) -> Iterator[Diagnostic]:
                 f"at most {MAX_METHODS_PER_SERVICE} allowed",
                 first_over.line, first_over.col)
 
+def _declared_names(schema: Schema):
+    for s in schema.structs:
+        yield "struct", s
+        for f in s.fields:
+            yield "field", f
+    for svc in schema.services:
+        yield "service", svc
+        for m in svc.methods:
+            yield "method", m
+            for a in m.args:
+                yield "argument", a
+            if isinstance(m.returns, TupleReturn):
+                for a in m.returns.fields:
+                    yield "return value", a
+
+def check_reserved_names(schema:Schema) -> Iterator[Diagnostic]:
+    for what, node in _declared_names(schema):
+        name = node.name
+        if name.startswith("_"):
+            reason = "names starting with '_' are reserved for generated code"
+        elif name in PYTHON_KEYWORDS:
+            reason = "it is a Python keyword"
+        elif name in C_KEYWORDS:
+            reason = "it is a C keyword"
+        elif name in GENERATED_MEMBERS.get(what, ()):
+            reason = "generated code defines a member with this name"
+        else:
+            continue
+        yield Diagnostic(f"{what} name '{name}' is reserved: {reason}",
+                         node.line, node.col)
+
 Rule = Callable[[Schema], Iterable[Diagnostic]]
 
 RULES: list[Rule] = [
@@ -116,6 +171,7 @@ RULES: list[Rule] = [
     check_dup_names,
     check_single_service,
     check_method_count,
+    check_reserved_names,
 ]
 
 def validate(schema: Schema, rules: Optional[Sequence[Rule]] = None) -> list[Diagnostic]:
