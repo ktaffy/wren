@@ -60,10 +60,41 @@ def check_struct_refs(schema: Schema) -> Iterator[Diagnostic]:
         if isinstance(decl, Struct):
             declared.add(decl.name)
 
+def _duplicates(entries) -> Iterator[Diagnostic]:
+    first: dict[str, tuple[str, object]] = {}
+    for name, what, node in entries:
+        if name not in first:
+            first[name] = (what, node)
+            continue
+        first_what, first_node = first[name]
+        if what == first_what:
+            msg = f"duplicate {what} '{name}' (first declared on line {first_node.line})"
+        else:
+            msg = f"{what} '{name}' conflicts with {first_what} on line {first_node.line}"
+        yield Diagnostic(msg, node.line, node.col)
+
+def check_dup_names(schema:Schema) -> Iterator[Diagnostic]:
+    top = [(s.name, "struct", s) for s in schema.structs]
+    top += [(v.name, "service", v) for v in schema.services]
+    top.sort(key=lambda e: (e[2].line, e[2].col))
+    yield from _duplicates(top)
+
+    for s in schema.structs:
+        yield from _duplicates((f.name, "field", f) for f in s.fields)
+
+    for svc in schema.services:
+        yield from _duplicates((m.name, "method", m) for m in svc.methods)
+        for m in svc.methods:
+            yield from _duplicates((a.name, "argument", a) for a in m.args)
+            if isinstance(m.returns, TupleReturn):
+                yield from _duplicates(
+                    (a.name, "return value", a) for a in m.returns.fields)
+
 Rule = Callable[[Schema], Iterable[Diagnostic]]
 
 RULES: list[Rule] = [
     check_struct_refs,
+    check_dup_names,
 ]
 
 def validate(schema: Schema, rules: Optional[Sequence[Rule]] = None) -> list[Diagnostic]:

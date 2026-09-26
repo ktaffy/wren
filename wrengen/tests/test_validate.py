@@ -95,5 +95,53 @@ class TestStructRefs(unittest.TestCase):
             "line 1:46: unknown type 'Qq'",
         ])
 
+class TestDupNames(unittest.TestCase):
+
+    def test_same_name_in_different_scopes_is_valid(self):
+        src = ("struct Point { f64 x; }\n"
+               "struct point { f64 x; }\n"
+               "struct Line { Point Point; }\n"
+               "service S { f(u32 a); g(u32 a); }\n")
+        self.assertEqual(diags(src), [])
+
+    def test_duplicate_struct(self):
+        self.assertEqual(
+            diags("struct A {}\nstruct A {}"),
+            ["line 2:1: duplicate struct 'A' (first declared on line 1)"])
+
+    def test_struct_and_service_share_scope(self):
+        self.assertEqual(
+            diags("struct Calc {}\nservice Calc {}"),
+            ["line 2:1: service 'Calc' conflicts with struct on line 1"])
+
+    def test_duplicate_field(self):
+        src = "struct P {\n    f64 x;\n    f64 x;\n}"
+        self.assertEqual(
+            diags(src),
+            ["line 3:5: duplicate field 'x' (first declared on line 2)"])
+
+    def test_duplicate_method(self):
+        src = "service S {\n    f();\n    f();\n}"
+        self.assertEqual(
+            diags(src),
+            ["line 3:5: duplicate method 'f' (first declared on line 2)"])
+
+    def test_duplicate_argument(self):
+        self.assertEqual(
+            diags("service S { f(u32 a, u32 a); }"),
+            ["line 1:22: duplicate argument 'a' (first declared on line 1)"])
+
+    def test_duplicate_tuple_return_name(self):
+        self.assertEqual(
+            diags("service S { f() -> (u32 q, u32 q); }"),
+            ["line 1:28: duplicate return value 'q' (first declared on line 1)"])
+
+    def test_every_repeat_is_reported(self):
+        src = "struct P {\n    f64 x;\n    f64 x;\n    f64 x;\n}"
+        self.assertEqual(diags(src), [
+            "line 3:5: duplicate field 'x' (first declared on line 2)",
+            "line 4:5: duplicate field 'x' (first declared on line 2)",
+        ])
+
 if __name__ == "__main__":
     unittest.main()
