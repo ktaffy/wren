@@ -1,18 +1,17 @@
 import pathlib
 import unittest
 
+from wrengen.ast import Method, Schema, Service
 from wrengen.parser import parse
 from wrengen.validate import Diagnostic, validate
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "calc.wren"
-
 
 class TestDiagnostic(unittest.TestCase):
 
     def test_str_format_matches_parse_errors(self):
         d = Diagnostic("unknown type 'Pointt'", 3, 5)
         self.assertEqual(str(d), "line 3:5: unknown type 'Pointt'")
-
 
 class TestValidate(unittest.TestCase):
 
@@ -142,6 +141,37 @@ class TestDupNames(unittest.TestCase):
             "line 3:5: duplicate field 'x' (first declared on line 2)",
             "line 4:5: duplicate field 'x' (first declared on line 2)",
         ])
+
+class TestSingleService(unittest.TestCase):
+
+    def test_structs_only_is_valid(self):
+        self.assertEqual(diags("struct P { f64 x; }"), [])
+
+    def test_second_service_rejected(self):
+        self.assertEqual(
+            diags("service A {}\nservice B {}"),
+            ["line 2:1: only one service per schema is allowed (first declared on line 1)"])
+
+    def test_every_extra_service_reported(self):
+        self.assertEqual(diags("service A {}\nservice B {}\nservice C {}"), [
+            "line 2:1: only one service per schema is allowed (first declared on line 1)",
+            "line 3:1: only one service per schema is allowed (first declared on line 1)",
+        ])
+
+def service_with(n):
+    methods = tuple(
+        Method(f"m{i}", (), None, method_id=i+1, line=i+2, col=5)
+        for i in range(n))
+    return Schema(services=(Service("S", methods, line=1, col=1),))
+
+class TestMethodCount(unittest.TestCase):
+    def test_max_methods_is_valid(self):
+        self.assertEqual(validate(service_with(65535)), [])
+
+    def test_one_over_max_rejected(self):
+        self.assertEqual(
+            [str(d) for d in validate(service_with(65536))],
+            ["line 65537:5: service 'S' declares 65536 methods; at most 65535 allowed"])
 
 if __name__ == "__main__":
     unittest.main()

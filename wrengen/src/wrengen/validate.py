@@ -5,6 +5,8 @@ from typing import Callable, Iterable, Optional, Sequence, Iterator
 
 from .ast import Schema, Struct, StructType, ArrayType, TupleReturn, Type
 
+MAX_METHODS_PER_SERVICE = 65535
+
 @dataclass(frozen=True)
 class Diagnostic:
     message: str
@@ -90,11 +92,31 @@ def check_dup_names(schema:Schema) -> Iterator[Diagnostic]:
                 yield from _duplicates(
                     (a.name, "return value", a) for a in m.returns.fields)
 
+def check_single_service(schema: Schema) -> Iterator[Diagnostic]:
+    services = schema.services
+    for extra in services[1:]:
+        yield Diagnostic(
+            f"only one service per schema allowed "
+            f"(first delcared on line {services[0].line})",
+            extra.line, extra.call
+        )
+
+def check_method_count(schema: Schema) -> Iterator[Diagnostic]:
+    for svc in schema.services:
+        if len(svc.methods) > MAX_METHODS_PER_SERVICE:
+            first_over = svc.methods[MAX_METHODS_PER_SERVICE]
+            yield Diagnostic(
+                f"service '{svc.name}' declares {len(svc.methods)} methods; "
+                f"at most {MAX_METHODS_PER_SERVICE} allowed",
+                first_over.line, first_over.col)
+
 Rule = Callable[[Schema], Iterable[Diagnostic]]
 
 RULES: list[Rule] = [
     check_struct_refs,
     check_dup_names,
+    check_single_service,
+    check_method_count,
 ]
 
 def validate(schema: Schema, rules: Optional[Sequence[Rule]] = None) -> list[Diagnostic]:
