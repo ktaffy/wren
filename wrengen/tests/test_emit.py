@@ -81,6 +81,22 @@ class TestEmitStructs(unittest.TestCase):
         with self.assertRaises(WrenDecodeError):
             Point.decode(b"\x00" * 17)
 
+    def test_user_names_cannot_shadow_generated_code(self):
+        ns = load("""
+            struct Reader { u32 x; }
+            struct Writer { u32 x; }
+            struct dataclass { u32 x; }
+            struct len { u32 x; }
+            struct range { u32 x; }
+            struct ValueError { u32 x; }
+            struct Box { u32[] items; u8[2] pair; Reader r; }
+        """)
+        Box, Reader = ns["Box"], ns["Reader"]
+        box = Box([1, 2], [3, 4], Reader(5))
+        self.assertEqual(Box.decode(box.encode()), box)
+        with self.assertRaises(ValueError):
+            Box([1], [3], Reader(5)).encode()
+
 
 if __name__ == "__main__":
     unittest.main()
