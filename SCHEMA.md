@@ -84,6 +84,21 @@ service Calc {
 }
 ```
 
+## Names
+
+Every name belongs to a scope, and must be unique within that scope:
+
+- **Top level:** struct names and service names share one scope, so a
+  struct and a service cannot have the same name.
+- **Struct:** field names are unique within their struct.
+- **Service:** method names are unique within their service.
+- **Method:** argument names are unique within their method. Names in a
+  tuple return are unique within that tuple.
+
+Names in different scopes never conflict. Two structs may each have a
+field named `id`, and a field may share its name with a struct. Names
+are case-sensitive, so `Point` and `point` are distinct.
+
 ### Method syntax
 
 `METHOD_NAME ( ARG_LIST ) [-> RETURN_TYPE] ;`
