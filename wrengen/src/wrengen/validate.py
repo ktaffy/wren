@@ -153,6 +153,8 @@ def check_reserved_names(schema:Schema) -> Iterator[Diagnostic]:
         name = node.name
         if name.startswith("_"):
             reason = "names starting with '_' are reserved for generated code"
+        elif name.startswith("wren_"):
+            reason = "names starting with 'wren_' are reserved for the wren runtime"
         elif name in PYTHON_KEYWORDS:
             reason = "it is a Python keyword"
         elif name in C_KEYWORDS:

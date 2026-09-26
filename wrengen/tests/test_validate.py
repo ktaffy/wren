@@ -217,5 +217,11 @@ class TestReservedNames(unittest.TestCase):
         self.assertEqual(missing, set(),
                          "new Python keywords; add them to PYTHON_KEYWORDS")
 
+    def test_wren_prefix(self):
+        self.assertEqual(
+            diags("struct wren_bytes_t {}"),
+            ["line 1:1: struct name 'wren_bytes_t' is reserved: "
+             "names starting with 'wren_' are reserved for the wren runtime"])
+
 if __name__ == "__main__":
     unittest.main()
