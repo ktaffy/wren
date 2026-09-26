@@ -21,27 +21,27 @@ unions, optionals, defaults, and imports are intentionally absent from v1.
 
 These match the wire types defined in PROTOCOL.md exactly.
 
-| Type      | Wire format                         |
-|-----------|-------------------------------------|
-| `bool`    | 1 byte (0 or 1)                     |
-| `u8`      | 1 byte                              |
-| `u16`     | 2 bytes, network byte order         |
-| `u32`     | 4 bytes, network byte order         |
-| `u64`     | 8 bytes, network byte order         |
-| `i8`      | 1 byte (signed)                     |
-| `i16`     | 2 bytes, network byte order         |
-| `i32`     | 4 bytes, network byte order         |
-| `i64`     | 8 bytes, network byte order         |
-| `f32`     | 4 bytes, IEEE 754 binary32          |
-| `f64`     | 8 bytes, IEEE 754 binary64          |
-| `bytes`   | `[len: u32][data: <len> bytes]`     |
-| `string`  | Same wire format as `bytes`; UTF-8  |
+| Type     | Wire format                        |
+| -------- | ---------------------------------- |
+| `bool`   | 1 byte (0 or 1)                    |
+| `u8`     | 1 byte                             |
+| `u16`    | 2 bytes, network byte order        |
+| `u32`    | 4 bytes, network byte order        |
+| `u64`    | 8 bytes, network byte order        |
+| `i8`     | 1 byte (signed)                    |
+| `i16`    | 2 bytes, network byte order        |
+| `i32`    | 4 bytes, network byte order        |
+| `i64`    | 8 bytes, network byte order        |
+| `f32`    | 4 bytes, IEEE 754 binary32         |
+| `f64`    | 8 bytes, IEEE 754 binary64         |
+| `bytes`  | `[len: u32][data: <len> bytes]`    |
+| `string` | Same wire format as `bytes`; UTF-8 |
 
 ## Composite types
 
 ### Arrays
 
-- `T[]`  — variable-length array. Wire: `[count: u32][element × count]`.
+- `T[]` — variable-length array. Wire: `[count: u32][element × count]`.
 - `T[N]` — fixed-length array of exactly `N` elements. Wire: `element × N`,
   no length prefix.
 
@@ -51,6 +51,7 @@ These match the wire types defined in PROTOCOL.md exactly.
 
 A `struct` declaration defines a named composite type. Fields are encoded
 in declaration order, back-to-back, with no padding.
+
 ```
 struct Point {
     f64 x;
@@ -59,7 +60,17 @@ struct Point {
 ```
 
 Fields follow the syntax `TYPE NAME;`. Arrays and nested structs are
-allowed. Structs must be declared before they are used.
+allowed.
+
+A struct must be declared before it is referenced. Every reference to a
+struct type, whether in a field, a method argument, or a return type,
+must name a struct whose declaration appears earlier in the file. A
+struct counts as declared once its closing `}` is reached, so a struct
+cannot refer to itself, directly or through an array. As a result,
+recursive types cannot be expressed like Trees and linked lists.
+Flatten them into an array of nodes that refer toe achother by index.
+Will probably add this later ins a schema update, but too compicated
+for now.
 
 ## Services
 
@@ -74,6 +85,7 @@ service Calc {
 ```
 
 ### Method syntax
+
 `METHOD_NAME ( ARG_LIST ) [-> RETURN_TYPE] ;`
 
 - `METHOD_NAME` is an identifier, unique within the service.
@@ -95,6 +107,7 @@ Equivalent on the wire to returning a struct with those two fields in
 that order.
 
 ## Example
+
 ```
 // calc.wren
 struct Point {
