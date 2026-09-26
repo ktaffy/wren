@@ -1,0 +1,25 @@
+name: test
+
+on:
+    push:
+    pull_request:
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: "3.12"
+
+            - name: Install python packages
+              run: python3 -m pip install -e python -e wrengen
+
+            - name: Run all tests
+              run: make test
+
+            - name: Show server log on failure
+              if: failure()
+              run: cat c/build/server.log || true
