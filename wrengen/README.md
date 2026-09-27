@@ -13,7 +13,11 @@ From this directory:
 
 ## Usage
 
-    wrengen --lang=python-client calc.wren -o calc_client.py
+    wrengen calc.wren --lang py --out gen/    # writes gen/calc.py
+    wrengen calc.wren --lang c  --out gen/    # writes gen/calc.h, gen/calc.c
+
+Errors are reported as `file:line:col: error: message`, and nothing is
+written unless the schema is valid.
 
 ## Schema language
 

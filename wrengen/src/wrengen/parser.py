@@ -9,7 +9,8 @@ from .typemap import PRIMITIVES
 
 class ParseError(Exception):
     def __init__(self, message: str, token: Token):
-        super().__init__(f"line {token.line}:{token.col}: {message} (got {token.kind.name} {token.value!r})")
+        self.message = f"{message} (got {token.kind.name} {token.value!r})"
+        super().__init__(f"line {token.line}:{token.col}: {self.message}")
         self.token = token
 
 class Parser:
