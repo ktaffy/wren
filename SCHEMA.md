@@ -1,56 +1,45 @@
-# wren schema specification v0.1
+# wren schema spec (v0.1)
 
-A wren schema file (conventionally `*.wren`) describes one or more services
-and any named types they use. The schema is consumed by `wrengen` to
-produce per-language client and server code.
+A .wren file/schema describes a service and the types it uses. `wrengen` reads it and generates client and server code for each language.
 
-The schema language is deliberately minimal — it describes only what the
-wire protocol can carry (see PROTOCOL.md). Rich features like generics,
-unions, optionals, defaults, and imports are intentionally absent from v1.
+The schema language is kept small on purpose. It can only describe what the wire protocol can actually carry (see [PROTOCOL.md](PROTOCOL.md)). Nicer features like generics, unions, optionals, defaults and imports aren't in v0.1.
 
-## Lexical structure
+## Lexical stuff
 
-- **Whitespace** (spaces, tabs, newlines) separates tokens and is otherwise
-  ignored.
-- **Comments** start with `//` and run to the end of the line. There are no
-  block comments.
-- **Identifiers** start with a letter or underscore and contain letters,
-  digits, and underscores. They are case-sensitive.
+- **Whitespace** (spaces, tabs, newlines) just separates tokens and is otherwise ignored.
+- **Comments** start with `//` and go to the end of the line. There are no block comments.
+- **Identifiers** start with a letter or underscore and can contain letters, digits and underscores. They're case-sensitive. (Names starting with an underscore are allowed by the lexer, but rejected as reserved; see [Reserved names](#reserved-names).)
 
 ## Primitive types
 
-These match the wire types defined in PROTOCOL.md exactly.
+These match the wire types in PROTOCOL.md exactly.
 
-| Type     | Wire format                        |
-| -------- | ---------------------------------- |
-| `bool`   | 1 byte (0 or 1)                    |
-| `u8`     | 1 byte                             |
-| `u16`    | 2 bytes, network byte order        |
-| `u32`    | 4 bytes, network byte order        |
-| `u64`    | 8 bytes, network byte order        |
-| `i8`     | 1 byte (signed)                    |
-| `i16`    | 2 bytes, network byte order        |
-| `i32`    | 4 bytes, network byte order        |
-| `i64`    | 8 bytes, network byte order        |
-| `f32`    | 4 bytes, IEEE 754 binary32         |
-| `f64`    | 8 bytes, IEEE 754 binary64         |
-| `bytes`  | `[len: u32][data: <len> bytes]`    |
-| `string` | Same wire format as `bytes`; UTF-8 |
+| Type     | Wire format                     |
+| -------- | ------------------------------- |
+| `bool`   | 1 byte (0 or 1)                 |
+| `u8`     | 1 byte                          |
+| `u16`    | 2 bytes, big-endian             |
+| `u32`    | 4 bytes, big-endian             |
+| `u64`    | 8 bytes, big-endian             |
+| `i8`     | 1 byte (signed)                 |
+| `i16`    | 2 bytes, big-endian             |
+| `i32`    | 4 bytes, big-endian             |
+| `i64`    | 8 bytes, big-endian             |
+| `f32`    | 4 bytes, IEEE 754 binary32      |
+| `f64`    | 8 bytes, IEEE 754 binary64      |
+| `bytes`  | `[len: u32][data: <len> bytes]` |
+| `string` | Same as `bytes`, but UTF-8      |
 
-## Composite types
+## Arrays
 
-### Arrays
+- `T[]` is a variable-length array. On the wire: `[count: u32][element × count]`.
+- `T[N]` is a fixed-length array of exactly `N` elements. On the wire: just `element × N`, with no count in front.
 
-- `T[]` — variable-length array. Wire: `[count: u32][element × count]`.
-- `T[N]` — fixed-length array of exactly `N` elements. Wire: `element × N`,
-  no length prefix.
+`T` can be any type, including a struct or another array.
 
-`T` may be any type: primitive, struct, or another array.
+## Structs
 
-### Structs
-
-A `struct` declaration defines a named composite type. Fields are encoded
-in declaration order, back-to-back, with no padding.
+A `struct` defines a named type. Its fields are encoded in the order they're declared, back to back, with no padding.
 
 ```
 struct Point {
@@ -59,28 +48,17 @@ struct Point {
 }
 ```
 
-Fields follow the syntax `TYPE NAME;`. Arrays and nested structs are
-allowed.
+Fields are written `TYPE NAME;`, and they can be arrays or other structs.
 
-A struct must be declared before it is referenced. Every reference to a
-struct type, whether in a field, a method argument, or a return type,
-must name a struct whose declaration appears earlier in the file. A
-struct counts as declared once its closing `}` is reached, so a struct
-cannot refer to itself, directly or through an array. As a result,
-recursive types cannot be expressed like Trees and linked lists.
-Flatten them into an array of nodes that refer toe achother by index.
-Will probably add this later ins a schema update, but too compicated
-for now.
+**Structs have to be declared before they're used.** Anywhere you reference a struct, that struct's declaration has to appear earlier in the file. A struct only counts as declared once you hit its closing `}`, so a struct can't refer to itself, either directly or through an array.
+
+This means you can't write recursive types like trees or linked lists. The workaround is to flatten them into an array of nodes that point at each other by index. I might add recursive types in a later version, but its just doing too much, so they're out for now.
 
 ## Services
 
-A `service` declaration defines a group of methods. Each service becomes
-one family of generated stubs (client and/or server).
+A `service` defines a group of methods. It's what gets turned into a client and a server.
 
-A schema declares at most one service. The wire header carries a method
-ID but no service identifier, so one server hosts exactly one service's
-methods. A program that hosts several services runs one server per
-service.
+**A schema can have at most one service.** The wire header has a method ID but no service ID, so one server can only host one service. If a program needs several services, it runs one server per service.
 
 ```
 service Calc {
@@ -89,59 +67,45 @@ service Calc {
 }
 ```
 
-## Names
-
-Every name belongs to a scope, and must be unique within that scope:
-
-- **Top level:** struct names and service names share one scope, so a
-  struct and a service cannot have the same name.
-- **Struct:** field names are unique within their struct.
-- **Service:** method names are unique within their service.
-- **Method:** argument names are unique within their method. Names in a
-  tuple return are unique within that tuple.
-
-Names in different scopes never conflict. Two structs may each have a
-field named `id`, and a field may share its name with a struct. Names
-are case-sensitive, so `Point` and `point` are distinct.
-
 ### Method syntax
 
 `METHOD_NAME ( ARG_LIST ) [-> RETURN_TYPE] ;`
 
-- `METHOD_NAME` is an identifier, unique within the service.
-- `ARG_LIST` is a comma-separated list of `TYPE NAME` pairs, or empty.
-- `RETURN_TYPE` is a single type or a parenthesized tuple of typed names.
-  Omit `-> RETURN_TYPE` entirely for methods that return no value.
+- `METHOD_NAME` is an identifier, and it has to be unique within the service.
+- `ARG_LIST` is a comma-separated list of `TYPE NAME` pairs, or nothing.
+- `RETURN_TYPE` is either one type or a tuple of typed names in parentheses. Leave off `-> RETURN_TYPE` completely if the method doesn't return anything.
 
-Method IDs are assigned implicitly by declaration order, starting at 1.
-The first method declared in a service is method_id 1, the second is 2,
-and so on. Method IDs must not be written in the schema. Reordering
-methods is a breaking change to the wire format.
+**Method IDs come from declaration order,** starting at 1. The first method is method_id 1, the second is 2, and so on. You don't write IDs in the schema. This means that **reordering methods changes the wire format**, so it's a breaking change.
 
-Method IDs are 16-bit on the wire and 0 is reserved (see PROTOCOL.md),
-so a service declares at most 65,535 methods.
-
-## Reserved names
-
-Generated code must never collide with the target languages or with the
-names it defines for itself. The following are rejected anywhere a name
-is declared (structs, services, fields, methods, arguments, and tuple
-return names):
-
-- **Identifiers beginning with an underscore.** These are reserved for
-  names generated code uses internally.
-- **Keywords of any target language:** Python's keywords, and C's
-  keywords (C11, plus `bool`, `true`, and `false`).
-- **Names of generated members:** `encode` and `decode` as field names,
-  and `close` as a method name.
+Method IDs are 16 bits on the wire and 0 is reserved, so a service can have at most 65,535 methods.
 
 ### Multiple return values
 
-A method may return a tuple, treated on the wire as an anonymous struct:
+A method can return a tuple:
+
 `divmod(u32 a, u32 b) -> (u32 quotient, u32 remainder);`
 
-Equivalent on the wire to returning a struct with those two fields in
-that order.
+On the wire, that's exactly the same as returning a struct with those two fields in that order.
+
+## Names
+
+Every name lives in a scope, and it has to be unique within that scope:
+
+- **Top level:** struct names and the service name share one scope, so a struct and a service can't have the same name.
+- **Inside a struct:** field names have to be unique.
+- **Inside a service:** method names have to be unique.
+- **Inside a method:** argument names have to be unique, and so do the names in a tuple return.
+
+Names in different scopes never conflict. Two structs can both have a field called `id`, and a field can have the same name as a struct. Names are case-sensitive, so `Point` and `point` are different names.
+
+## Reserved names
+
+Generated code can't be allowed to collide with the target languages, or with the names it uses for itself. So these are rejected anywhere you declare a name (structs, services, fields, methods, arguments and tuple return names):
+
+- **Names starting with an underscore.** Generated code uses these for its own internal names.
+- **Names starting with `wren_`.** These are reserved for the wren runtime and the types generated code defines, like the C runtime's `wren_bytes_t`.
+- **Keywords in any target language.** That means Python's keywords, and C's keywords (C11, plus `bool`, `true` and `false`).
+- **Names of generated members:** `encode` and `decode` as field names, and `close` as a method name.
 
 ## Example
 
@@ -200,25 +164,20 @@ IDENT          = ( letter | "_" ) { letter | digit | "_" } ;
 NUMBER         = digit { digit } ;
 ```
 
-## What's intentionally not in v1
+## Things not in v0.1 (on purpose)
 
-- **Imports / multi-file schemas.** One service per file; copy shared types
-  if needed.
-- **Enums.** Use `u32` constants with documented values.
-- **Unions / sum types.** Use a struct with a discriminator field and
-  payload bytes.
-- **Generics.** No `Map<K, V>`, `Option<T>`, etc. Compose out of primitives.
-- **Optional fields.** Use a `bool` flag + the value.
-- **Default values.** Handle in application code.
-- **Annotations / metadata.** No decorator syntax on fields or methods.
-- **Service inheritance or composition.** Flat services only.
-- **Explicit method ID numbering.** IDs are by declaration order.
-- **Error type declarations.** Errors are runtime values; document codes
-  externally.
+- **Imports or multi-file schemas.** One service per file. copy shared types if you need them in more than one place.
+- **Enums.** Use a `u32` and document what each value means.
+- **Unions or sum types.** Use a struct with a "kind" field plus a `bytes` payload.
+- **Generics.** There's no `Map<K, V>` or `Option<T>`. build what you need out of the basic types.
+- **Optional fields.** Use a `bool` flag next to the value.
+- **Default values.** Handle them in your own code.
+- **Annotations or metadata.** There's no decorator syntax for fields or methods.
+- **Service inheritance or composition.** Services are flat.
+- **Choosing method IDs yourself.** IDs always come from declaration order.
+- **Declaring error types.** Errors are just runtime values, so document your error codes somewhere else.
+- **Recursive types.** See [Structs](#structs) for the workaround.
 
 ## Versioning
 
-This is schema language v0.1. The parser and codegen will tolerate
-future additive extensions (new primitives, new declaration kinds) by
-rejecting schemas that use unknown constructs. Breaking changes to
-existing syntax will increment the major version.
+This is version 0.1 of the schema language. If a schema uses something not explained here, it gets rejected rather than guessed at, which leaves room to add new primitives or new kinds of declarations later without breaking anything.

@@ -20,13 +20,27 @@ TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
 TEST_BINS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/tests/%,$(TEST_SRCS))
 
 OBJS = $(LIB_OBJS) $(EX_OBJS)
+PREFIX ?= /usr/local
+LIB     = $(BUILD_DIR)/libwren.a
 
-.PHONY: all run clean test
+.PHONY: all run clean test lib install
 
 all: $(TARGET)
 
 run: $(TARGET)
 	./$(TARGET)
+
+lib: $(LIB)
+
+$(LIB): $(LIB_OBJS)
+	ar rcs $@ $^
+
+install: $(LIB)
+	install -d $(DESTDIR)$(PREFIX)/lib/pkgconfig $(DESTDIR)$(PREFIX)/include/wren
+	install -m 644 $(LIB) $(DESTDIR)$(PREFIX)/lib/
+	install -m 644 include/wren/*.h $(DESTDIR)$(PREFIX)/include/wren/
+	printf 'prefix=%s\nincludedir=$${prefix}/include\nlibdir=$${prefix}/lib\n\nName: wren\nDescription: wren RPC server runtime\nVersion: 0.1.0\nCflags: -I$${includedir}\nLibs: -L$${libdir} -lwren\n' \
+	    '$(PREFIX)' > $(DESTDIR)$(PREFIX)/lib/pkgconfig/wren.pc
 
 $(TARGET): $(OBJS) | $(RELEASE_DIR)
 	$(CC) $(CC_FLAGS) -o $@ $^
